@@ -9,14 +9,56 @@
 
 static const char *TAG = "sendmy_transport";
 
-/* "smv1" - INFO prefix bound into every Carrier ID derivation. */
 static const uint8_t SM_TL_INFO[SM_TL_INFO_LEN] = { 0x73, 0x6D, 0x76, 0x31 };
 
 /*
- * HKDF-Expand (RFC 5869) for a single block. Since the requested output
- * length (SM_TL_CID_LEN = 27) is at most one HMAC-SHA-256 block (32 octets), only
- * T(1) = HMAC(PRK, info || 0x01) is computed and truncated to SM_TL_CID_LEN.
+ * ---------------------------------------------------------------------------
+ * Component static helper declaration
+ * ---------------------------------------------------------------------------
  */
+
+static esp_err_t hkdf_expand_single(const uint8_t  prk[SM_TL_UID_LEN],
+                                    const uint8_t  *info,
+                                    size_t         info_len,
+                                    uint8_t        okm[SM_TL_CID_LEN]);
+
+static esp_err_t compute_cid(const uint8_t uid[SM_TL_UID_LEN],
+                             uint32_t      mid,
+                             uint8_t       cid[SM_TL_CID_LEN]);
+
+/*
+ * ---------------------------------------------------------------------------
+ * Component API implementation
+ * ---------------------------------------------------------------------------
+ */
+
+esp_err_t sm_tl_build_carrier(const uint8_t    uid[SM_TL_UID_LEN],
+                              uint32_t         mid,
+                              uint8_t          payload,
+                              uint8_t          carrier[SM_TL_CARRIER_LEN]) {
+    // Compute CID into the first SM_TL_CID_LEN octets of the carrier
+    esp_err_t status = compute_cid(uid, mid, carrier);
+    if (status != ESP_OK) {
+        ESP_LOGE(TAG, "compute_cid failed for mid=%lu: %d",
+                 (unsigned long)mid, (int)status);
+        return status;
+    }
+
+    // Append payload as the final (28th) octet
+    carrier[SM_TL_CID_LEN] = payload;
+
+    ESP_LOGD(TAG, "built carrier mid=%lu payload=0x%02x",
+             (unsigned long)mid, payload);
+    return ESP_OK;
+}
+
+
+/*
+ * ---------------------------------------------------------------------------
+ * Component static helper implementation
+ * ---------------------------------------------------------------------------
+ */
+
 static esp_err_t hkdf_expand_single(const uint8_t  prk[SM_TL_UID_LEN],
                                     const uint8_t  *info,
                                     size_t         info_len,
@@ -71,7 +113,6 @@ static esp_err_t hkdf_expand_single(const uint8_t  prk[SM_TL_UID_LEN],
     size_t mac_len;
     status = psa_mac_sign_finish(&op, t1, sizeof(t1), &mac_len);
     if (status != PSA_SUCCESS) {
-        // A failed sign_finish aborts the operation internally.
         ESP_LOGE(TAG, "psa_mac_sign_finish failed: %d", (int)status);
         goto cleanup_key;
     }
@@ -91,7 +132,6 @@ cleanup_key:
 static esp_err_t compute_cid(const uint8_t uid[SM_TL_UID_LEN],
                              uint32_t      mid,
                              uint8_t       cid[SM_TL_CID_LEN]) {
-    // Build info string: INFO || mid (4-octet big-endian)
     uint8_t info[SM_TL_INFO_LEN + 4];
     memcpy(info, SM_TL_INFO, SM_TL_INFO_LEN);
     info[SM_TL_INFO_LEN + 0] = (mid >> 24) & 0xFF;
@@ -102,22 +142,3 @@ static esp_err_t compute_cid(const uint8_t uid[SM_TL_UID_LEN],
     return hkdf_expand_single(uid, info, sizeof(info), cid);
 }
 
-esp_err_t sm_tl_build_carrier(const uint8_t    uid[SM_TL_UID_LEN],
-                              uint32_t         mid,
-                              uint8_t          payload,
-                              uint8_t          carrier[SM_TL_CARRIER_LEN]) {
-    // Compute CID into the first SM_TL_CID_LEN octets of the carrier
-    esp_err_t status = compute_cid(uid, mid, carrier);
-    if (status != ESP_OK) {
-        ESP_LOGE(TAG, "compute_cid failed for mid=%lu: %d",
-                 (unsigned long)mid, (int)status);
-        return status;
-    }
-
-    // Append payload as the final (28th) octet
-    carrier[SM_TL_CID_LEN] = payload;
-
-    ESP_LOGD(TAG, "built carrier mid=%lu payload=0x%02x",
-             (unsigned long)mid, payload);
-    return ESP_OK;
-}

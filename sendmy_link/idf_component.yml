@@ -1,9 +1,5 @@
 version: "1.0.0"
-description: >-
-  Link layer of the sendmy protocol: packages a 28-byte key into a valid Apple
-  offline-finding (Find My-style) BLE advertisement and puts it on the air. Owns
-  the NimBLE stack, the manufacturer frame, and the rotating BLE random address;
-  knows nothing about what the key means.
+description: Link layer of the sendmy protocol
 tags:
   - ble
   - nimble

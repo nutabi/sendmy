@@ -1,14 +1,8 @@
 version: "1.0.0"
-description: >-
-  Transport layer of the sendmy protocol: a covert, one-way, store-and-forward
-  channel over Apple offline-finding (Find My). Encodes one octet of application
-  data into a 28-octet carrier (HKDF-derived Carrier ID || payload) that the
-  link layer broadcasts as a Find My key; a receiver holding the shared Unilink
-  ID recovers it by querying Apple for the carrier's existence.
+description: Transport layer of sendmy protocol
 tags:
   - findmy
   - offline-finding
-  - covert-channel
   - hkdf
   - esp32
 dependencies:
