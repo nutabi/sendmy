@@ -1,4 +1,4 @@
-#include "sendmy_transport.h"
+#include "sendmy_carrier.h"
 
 #include <string.h>
 
@@ -7,9 +7,9 @@
 #include "mbedtls/platform_util.h"
 #include "psa/crypto.h"
 
-static const char *TAG = "sendmy_transport";
+static const char *TAG = "sendmy_carrier";
 
-static const uint8_t SM_TL_INFO[SM_TL_INFO_LEN] = { 0x73, 0x6D, 0x76, 0x31 };
+static const uint8_t SM_CR_INFO[SM_CR_INFO_LEN] = { 0x73, 0x6D, 0x76, 0x31 };
 
 /*
  * ---------------------------------------------------------------------------
@@ -17,14 +17,14 @@ static const uint8_t SM_TL_INFO[SM_TL_INFO_LEN] = { 0x73, 0x6D, 0x76, 0x31 };
  * ---------------------------------------------------------------------------
  */
 
-static esp_err_t hkdf_expand_single(const uint8_t  prk[SM_TL_UID_LEN],
+static esp_err_t hkdf_expand_single(const uint8_t  prk[SM_CR_UID_LEN],
                                     const uint8_t  *info,
                                     size_t         info_len,
-                                    uint8_t        okm[SM_TL_CID_LEN]);
+                                    uint8_t        okm[SM_CR_CID_LEN]);
 
-static esp_err_t compute_cid(const uint8_t uid[SM_TL_UID_LEN],
+static esp_err_t compute_cid(const uint8_t uid[SM_CR_UID_LEN],
                              uint32_t      mid,
-                             uint8_t       cid[SM_TL_CID_LEN]);
+                             uint8_t       cid[SM_CR_CID_LEN]);
 
 /*
  * ---------------------------------------------------------------------------
@@ -32,11 +32,11 @@ static esp_err_t compute_cid(const uint8_t uid[SM_TL_UID_LEN],
  * ---------------------------------------------------------------------------
  */
 
-esp_err_t sm_tl_build_carrier(const uint8_t    uid[SM_TL_UID_LEN],
+esp_err_t sm_cr_build_carrier(const uint8_t    uid[SM_CR_UID_LEN],
                               uint32_t         mid,
                               uint8_t          payload,
-                              uint8_t          carrier[SM_TL_CARRIER_LEN]) {
-    // Compute CID into the first SM_TL_CID_LEN octets of the carrier
+                              uint8_t          carrier[SM_CR_CARRIER_LEN]) {
+    // Compute CID into the first SM_CR_CID_LEN octets of the carrier
     esp_err_t status = compute_cid(uid, mid, carrier);
     if (status != ESP_OK) {
         ESP_LOGE(TAG, "compute_cid failed for mid=%lu: %d",
@@ -45,7 +45,7 @@ esp_err_t sm_tl_build_carrier(const uint8_t    uid[SM_TL_UID_LEN],
     }
 
     // Append payload as the final (28th) octet
-    carrier[SM_TL_CID_LEN] = payload;
+    carrier[SM_CR_CID_LEN] = payload;
 
     ESP_LOGD(TAG, "built carrier mid=%lu payload=0x%02x",
              (unsigned long)mid, payload);
@@ -59,10 +59,10 @@ esp_err_t sm_tl_build_carrier(const uint8_t    uid[SM_TL_UID_LEN],
  * ---------------------------------------------------------------------------
  */
 
-static esp_err_t hkdf_expand_single(const uint8_t  prk[SM_TL_UID_LEN],
+static esp_err_t hkdf_expand_single(const uint8_t  prk[SM_CR_UID_LEN],
                                     const uint8_t  *info,
                                     size_t         info_len,
-                                    uint8_t        okm[SM_TL_CID_LEN]) {
+                                    uint8_t        okm[SM_CR_CID_LEN]) {
     psa_status_t status;
 
     // Make sure PSA is initialised
@@ -80,7 +80,7 @@ static esp_err_t hkdf_expand_single(const uint8_t  prk[SM_TL_UID_LEN],
     psa_set_key_bits(&attr, 256);
 
     psa_key_id_t key_id;
-    status = psa_import_key(&attr, prk, SM_TL_UID_LEN, &key_id);
+    status = psa_import_key(&attr, prk, SM_CR_UID_LEN, &key_id);
     if (status != PSA_SUCCESS) {
         ESP_LOGE(TAG, "psa_import_key failed: %d", (int)status);
         return ESP_FAIL;
@@ -117,7 +117,7 @@ static esp_err_t hkdf_expand_single(const uint8_t  prk[SM_TL_UID_LEN],
         goto cleanup_key;
     }
 
-    memcpy(okm, t1, SM_TL_CID_LEN);
+    memcpy(okm, t1, SM_CR_CID_LEN);
     mbedtls_platform_zeroize(t1, sizeof(t1));
     psa_destroy_key(key_id);
     return ESP_OK;
@@ -129,15 +129,15 @@ cleanup_key:
     return ESP_FAIL;
 }
 
-static esp_err_t compute_cid(const uint8_t uid[SM_TL_UID_LEN],
+static esp_err_t compute_cid(const uint8_t uid[SM_CR_UID_LEN],
                              uint32_t      mid,
-                             uint8_t       cid[SM_TL_CID_LEN]) {
-    uint8_t info[SM_TL_INFO_LEN + 4];
-    memcpy(info, SM_TL_INFO, SM_TL_INFO_LEN);
-    info[SM_TL_INFO_LEN + 0] = (mid >> 24) & 0xFF;
-    info[SM_TL_INFO_LEN + 1] = (mid >> 16) & 0xFF;
-    info[SM_TL_INFO_LEN + 2] = (mid >>  8) & 0xFF;
-    info[SM_TL_INFO_LEN + 3] = (mid >>  0) & 0xFF;
+                             uint8_t       cid[SM_CR_CID_LEN]) {
+    uint8_t info[SM_CR_INFO_LEN + 4];
+    memcpy(info, SM_CR_INFO, SM_CR_INFO_LEN);
+    info[SM_CR_INFO_LEN + 0] = (mid >> 24) & 0xFF;
+    info[SM_CR_INFO_LEN + 1] = (mid >> 16) & 0xFF;
+    info[SM_CR_INFO_LEN + 2] = (mid >>  8) & 0xFF;
+    info[SM_CR_INFO_LEN + 3] = (mid >>  0) & 0xFF;
 
     return hkdf_expand_single(uid, info, sizeof(info), cid);
 }

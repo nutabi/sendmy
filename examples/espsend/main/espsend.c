@@ -8,7 +8,7 @@
 #include "nvs_flash.h"
 
 #include "sendmy_link.h"
-#include "sendmy_transport.h"
+#include "sendmy_carrier.h"
 
 static const char *TAG = "espsend";
 
@@ -25,10 +25,10 @@ static const char *TAG = "espsend";
 
 // Unilink ID, shared out of band with the receiver. Provisioned into NVS
 // (namespace "sendmy", key "uid", 32 raw bytes) by the project's NVS scripts.
-static uint8_t s_uid[SM_TL_UID_LEN];
+static uint8_t s_uid[SM_CR_UID_LEN];
 
 // Load the Unilink ID from the "sendmy" NVS namespace into out.
-static esp_err_t load_uid(uint8_t out[SM_TL_UID_LEN])
+static esp_err_t load_uid(uint8_t out[SM_CR_UID_LEN])
 {
     nvs_handle_t handle;
     esp_err_t err = nvs_open("sendmy", NVS_READONLY, &handle);
@@ -37,7 +37,7 @@ static esp_err_t load_uid(uint8_t out[SM_TL_UID_LEN])
         return err;
     }
 
-    size_t len = SM_TL_UID_LEN;
+    size_t len = SM_CR_UID_LEN;
     err = nvs_get_blob(handle, "uid", out, &len);
     nvs_close(handle);
 
@@ -45,8 +45,8 @@ static esp_err_t load_uid(uint8_t out[SM_TL_UID_LEN])
         ESP_LOGE(TAG, "nvs_get_blob(uid): %s", esp_err_to_name(err));
         return err;
     }
-    if (len != SM_TL_UID_LEN) {
-        ESP_LOGE(TAG, "uid blob is %u bytes, expected %u", (unsigned)len, SM_TL_UID_LEN);
+    if (len != SM_CR_UID_LEN) {
+        ESP_LOGE(TAG, "uid blob is %u bytes, expected %u", (unsigned)len, SM_CR_UID_LEN);
         return ESP_ERR_INVALID_SIZE;
     }
     return ESP_OK;
@@ -58,9 +58,9 @@ static void sender_task(void *arg)
 {
     for (uint32_t mid = 0;; mid++) {
         uint8_t payload = (uint8_t)(1u << (mid % PAYLOAD_CYCLE));
-        uint8_t carrier[SM_TL_CARRIER_LEN];
+        uint8_t carrier[SM_CR_CARRIER_LEN];
 
-        esp_err_t err = sm_tl_build_carrier(s_uid, mid, payload, carrier);
+        esp_err_t err = sm_cr_build_carrier(s_uid, mid, payload, carrier);
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "build carrier mid=%lu: %s",
                      (unsigned long)mid, esp_err_to_name(err));

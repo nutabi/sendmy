@@ -1,5 +1,5 @@
 version: "1.0.0"
-description: Transport layer of sendmy protocol
+description: Carrier layer of sendmy protocol
 tags:
   - findmy
   - offline-finding

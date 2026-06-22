@@ -3,5 +3,5 @@ dependencies:
   # example builds against the in-tree component sources (../../../<component>).
   sendmy_link:
     path: ../../../sendmy_link
-  sendmy_transport:
-    path: ../../../sendmy_transport
+  sendmy_carrier:
+    path: ../../../sendmy_carrier
