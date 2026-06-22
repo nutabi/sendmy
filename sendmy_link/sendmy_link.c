@@ -12,7 +12,7 @@
 #include "host/ble_hs_id.h"
 #include "host/ble_gap.h"
 
-#define LOG_TAG "sendmy_link"
+static const char *TAG = "sendmy_link";
 
 #define BLE_ADV_PAYLOAD_LEN 27
 
@@ -74,15 +74,15 @@ esp_err_t sm_ll_init(void (*on_ready)(void), uint32_t adv_interval_ms) {
     s_on_ready = on_ready;
     s_adv_interval_ms = adv_interval_ms;
 
-    ESP_LOGI(LOG_TAG, "initialising Find My advertising (interval %lu ms)",
+    ESP_LOGI(TAG, "initialising Find My advertising (interval %lu ms)",
              (unsigned long)adv_interval_ms);
 
     esp_err_t err = nimble_port_init();
     if (err != ESP_OK) {
-        ESP_LOGE(LOG_TAG, "nimble port init failed: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "nimble port init failed: %s", esp_err_to_name(err));
         return err;
     }
-    ESP_LOGI(LOG_TAG, "nimble port initialised, starting host task");
+    ESP_LOGI(TAG, "nimble port initialised, starting host task");
 
     ble_npl_mutex_init(&s_key_lock);
     ble_npl_event_init(&s_apply_ev, apply_ev_cb, NULL);
@@ -97,11 +97,11 @@ esp_err_t sm_ll_init(void (*on_ready)(void), uint32_t adv_interval_ms) {
 
 esp_err_t sm_ll_set_key(const uint8_t key[SM_LL_KEY_LEN]) {
     if (key == NULL) {
-        ESP_LOGE(LOG_TAG, "key is null");
+        ESP_LOGE(TAG, "key is null");
         return ESP_ERR_INVALID_ARG;
     }
     if (!s_inited) {
-        ESP_LOGE(LOG_TAG, "set_key called before init");
+        ESP_LOGE(TAG, "set_key called before init");
         return ESP_ERR_INVALID_STATE;
     }
 
@@ -127,11 +127,11 @@ esp_err_t sm_ll_set_key(const uint8_t key[SM_LL_KEY_LEN]) {
  */
 
 static void on_reset(int reason) {
-    ESP_LOGW(LOG_TAG, "nimble host reset, reason=%d", reason);
+    ESP_LOGW(TAG, "nimble host reset, reason=%d", reason);
 }
 
 static void on_sync(void) {
-    ESP_LOGI(LOG_TAG, "nimble host synced");
+    ESP_LOGI(TAG, "nimble host synced");
     s_synced = true;
 
     uint8_t key[SM_LL_KEY_LEN];
@@ -143,7 +143,7 @@ static void on_sync(void) {
     ble_npl_mutex_release(&s_key_lock);
 
     if (has_key && adv_apply(key) != ESP_OK) {
-        ESP_LOGE(LOG_TAG, "advertising start failed");
+        ESP_LOGE(TAG, "advertising start failed");
     }
 
     if (s_on_ready != NULL && !s_ready_called) {
@@ -165,12 +165,12 @@ static void apply_ev_cb(struct ble_npl_event *ev) {
     ble_npl_mutex_release(&s_key_lock);
 
     if (has_key && s_synced && adv_apply(key) != ESP_OK) {
-        ESP_LOGE(LOG_TAG, "advertising update failed");
+        ESP_LOGE(TAG, "advertising update failed");
     }
 }
 
 static void host_task(void *param) {
-    ESP_LOGI(LOG_TAG, "nimble host task started");
+    ESP_LOGI(TAG, "nimble host task started");
     nimble_port_run();
     nimble_port_freertos_deinit();
 }
@@ -195,14 +195,14 @@ static void build_addr(const uint8_t key[SM_LL_KEY_LEN], uint8_t addr[6]) {
 static esp_err_t adv_apply(const uint8_t key[SM_LL_KEY_LEN]) {
     int rc = ble_gap_adv_stop();
     if (rc != 0 && rc != BLE_HS_EALREADY) {
-        ESP_LOGW(LOG_TAG, "adv stop returned %d", rc);
+        ESP_LOGW(TAG, "adv stop returned %d", rc);
     }
 
     uint8_t addr[6];
     build_addr(key, addr);
     rc = ble_hs_id_set_rnd(addr);
     if (rc != 0) {
-        ESP_LOGE(LOG_TAG, "set random address failed: %d", rc);
+        ESP_LOGE(TAG, "set random address failed: %d", rc);
         return ESP_FAIL;
     }
 
@@ -213,7 +213,7 @@ static esp_err_t adv_apply(const uint8_t key[SM_LL_KEY_LEN]) {
 
     rc = ble_gap_adv_set_data(data, sizeof(data));
     if (rc != 0) {
-        ESP_LOGE(LOG_TAG, "set adv data failed: %d", rc);
+        ESP_LOGE(TAG, "set adv data failed: %d", rc);
         return ESP_FAIL;
     }
 
@@ -226,12 +226,12 @@ static esp_err_t adv_apply(const uint8_t key[SM_LL_KEY_LEN]) {
     rc = ble_gap_adv_start(BLE_OWN_ADDR_RANDOM, NULL, BLE_HS_FOREVER, &params,
                            NULL, NULL);
     if (rc != 0) {
-        ESP_LOGE(LOG_TAG, "adv start failed: %d", rc);
+        ESP_LOGE(TAG, "adv start failed: %d", rc);
         return ESP_FAIL;
     }
 
-    ESP_LOGI(LOG_TAG, "advertising as %02X:%02X:%02X:%02X:%02X:%02X",
+    ESP_LOGI(TAG, "advertising as %02X:%02X:%02X:%02X:%02X:%02X",
              addr[5], addr[4], addr[3], addr[2], addr[1], addr[0]);
-    ESP_LOG_BUFFER_HEX_LEVEL(LOG_TAG, data, sizeof(data), ESP_LOG_DEBUG);
+    ESP_LOG_BUFFER_HEX_LEVEL(TAG, data, sizeof(data), ESP_LOG_DEBUG);
     return ESP_OK;
 }
