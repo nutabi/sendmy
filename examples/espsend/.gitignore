@@ -1,0 +1,19 @@
+# Claude instruction/memory
+.claude/
+CLAUDE.md
+
+# CMake build
+build/
+.cache/
+managed_components/
+
+# Configuration
+sdkconfig*
+!sdkconfig.defaults
+dependencies.lock
+
+# MacOS
+.DS_Store
+
+# Secrets
+uid.hex

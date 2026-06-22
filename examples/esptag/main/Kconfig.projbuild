@@ -1,0 +1,104 @@
+menu "esptag configuration"
+
+choice ESPTAG_OWN_LOG_LEVEL_CHOICE
+    prompt "Log level for esptag's own modules"
+    default ESPTAG_OWN_LOG_LEVEL_INFO
+    help
+        Runtime log level applied at startup to this project's own log tags
+        (main, crypto, nvs_store, tag, ble_adv). The system-wide default stays
+        at WARN (see CONFIG_LOG_DEFAULT_LEVEL), keeping the IDF / NimBLE /
+        controller components quiet; this only adjusts our own modules.
+
+        Levels above WARN require CONFIG_LOG_MAXIMUM_LEVEL to be high enough
+        for the calls to be compiled in (this project compiles VERBOSE in).
+
+    config ESPTAG_OWN_LOG_LEVEL_NONE
+        bool "No output"
+    config ESPTAG_OWN_LOG_LEVEL_ERROR
+        bool "Error"
+    config ESPTAG_OWN_LOG_LEVEL_WARN
+        bool "Warning"
+    config ESPTAG_OWN_LOG_LEVEL_INFO
+        bool "Info"
+    config ESPTAG_OWN_LOG_LEVEL_DEBUG
+        bool "Debug"
+    config ESPTAG_OWN_LOG_LEVEL_VERBOSE
+        bool "Verbose"
+endchoice
+
+config ESPTAG_OWN_LOG_LEVEL
+    int
+    # Values match the esp_log_level_t enum (NONE=0 .. VERBOSE=5).
+    default 0 if ESPTAG_OWN_LOG_LEVEL_NONE
+    default 1 if ESPTAG_OWN_LOG_LEVEL_ERROR
+    default 2 if ESPTAG_OWN_LOG_LEVEL_WARN
+    default 3 if ESPTAG_OWN_LOG_LEVEL_INFO
+    default 4 if ESPTAG_OWN_LOG_LEVEL_DEBUG
+    default 5 if ESPTAG_OWN_LOG_LEVEL_VERBOSE
+
+config ESPTAG_ROTATE_ENABLE
+    bool "Rotate the advertising key/identifier"
+    default y
+    help
+        Periodically advance an epoch: ratchet the symmetric key, derive a fresh
+        advertising identifier, and re-advertise under it (every
+        CONFIG_ESPTAG_ROTATE_INTERVAL_MS). This is the privacy core of the
+        design — rotating identities is what stops a passive observer from
+        linking sightings over time.
+
+        Disable only for debugging or characterisation where you want the tag to
+        keep advertising under a single, static identity: the rotation timer is
+        never armed, so it stays at the boot epoch indefinitely.
+
+config ESPTAG_ROTATE_INTERVAL_MS
+    int "Key/identifier rotation interval (ms)"
+    default 900000
+    range 1000 86400000
+    help
+        How often the tag advances an epoch: ratchets the symmetric key, derives
+        a fresh advertising identifier, and re-advertises under it. The default
+        of 900000 ms (15 min) matches the Find My cadence; lower it to a few
+        seconds to watch rotation happen while testing.
+
+config ESPTAG_ADV_INTERVAL_MS
+    int "BLE advertising interval (ms)"
+    default 2000
+    range 20 10240
+    help
+        How often a BLE legacy advertising event fires. One advertising event
+        sweeps all three primary channels (37/38/39) exactly once, so this is
+        effectively "one broadcast per channel per window". itvl_min and
+        itvl_max are both pinned to this value (see ble_adv.c), giving a fixed
+        interval with no min/max jitter; the controller still adds the
+        spec-mandated 0-10 ms advDelay on top.
+
+        The range matches the BLE legacy non-connectable advertising limits
+        (20 ms .. 10240 ms).
+
+config ESPTAG_PERSIST_COUNTER
+    bool "Persist rotation counter across reboots"
+    default y
+    help
+        Persist the rotation counter to a writable NVS namespace and, at boot,
+        fast-forward the symmetric-key ratchet to that epoch (crypto_advance_sk).
+        This stops the tag from replaying the same identifier sequence
+        (p_0, p_1, ...) after every power cycle — a linkability regression for a
+        privacy design.
+
+        When set, the counter is read at startup and written after each epoch
+        advance. When unset, the tag always boots at counter 0 and never writes
+        the counter — an ephemeral mode for testing (rapid rotation with no flash
+        wear and reproducible from-zero behavior).
+
+config ESPTAG_ZEROIZE
+    bool "Scrub intermediate key material (zeroize)"
+    default y
+    help
+        Scrub all intermediate key material (scalars, SK ratchet state) with
+        mbedtls_platform_zeroize on every path, including error paths. When set,
+        CONFIG_ESPTAG_ZEROIZE gates those #ifdef guards in the sources directly.
+
+        Leave enabled for any real build; only disable for local debugging where
+        you want to inspect that material left on the stack.
+
+endmenu

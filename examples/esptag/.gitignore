@@ -1,0 +1,27 @@
+# Claude instruction/memory
+.claude/
+CLAUDE.md
+
+# CMake build
+build/
+.cache/
+managed_components/
+
+# Python environment
+.venv/
+__pycache__/
+
+# Configuration
+sdkconfig*
+!sdkconfig.defaults
+dependencies.lock
+
+# Secrets
+seed.key
+seed.keys
+seed.csv
+account.json
+anisette-libs.bin
+
+# MacOS
+.DS_Store

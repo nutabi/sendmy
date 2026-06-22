@@ -1,0 +1,102 @@
+# sdkconfig.defaults — esptag (Find My-style BLE locator tag)
+#
+# Regenerate sdkconfig from this file:   rm sdkconfig && idf.py reconfigure
+#
+# This project is a NON-CONNECTABLE BLE BEACON: it only broadcasts rotating
+# advertising identifiers. It never connects, pairs, scans, or serves GATT, so
+# the entire connection/GATT/security half of the BLE stack is disabled below.
+
+# ── Target / board: Seeed Studio XIAO ESP32-S3 (ESP32-S3R8) ──────────────────
+CONFIG_IDF_TARGET="esp32s3"
+CONFIG_APP_REPRODUCIBLE_BUILD=y
+
+# 8 MB flash. Default flash mode (DIO) and freq are left untouched — they are
+# universally safe on the XIAO's module; bump to QIO/80MHz only if you verify
+# boot on your unit.
+CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
+CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y
+
+# The XIAO ESP32-S3 carries 8 MB of OCTAL PSRAM. It is left DISABLED here: this
+# firmware's working set is a few hundred bytes and enabling SPIRAM only grows
+# the image. If you ever need it, uncomment the block below (octal mode is
+# mandatory for this module — the wrong mode will hang at boot):
+# CONFIG_SPIRAM=y
+# CONFIG_SPIRAM_MODE_OCT=y
+# CONFIG_SPIRAM_SPEED_80M=y
+
+# ── BLE: NimBLE host, broadcaster-only ───────────────────────────────────────
+CONFIG_BT_ENABLED=y
+CONFIG_BT_NIMBLE_ENABLED=y
+
+# Roles: keep only the broadcaster (advertising). Drop central, observer, and
+# peripheral — a non-connectable beacon needs none of them. GATT server/client
+# and the GAP service fall away with the peripheral role.
+CONFIG_BT_NIMBLE_ROLE_BROADCASTER=y
+CONFIG_BT_NIMBLE_ROLE_CENTRAL=n
+CONFIG_BT_NIMBLE_ROLE_OBSERVER=n
+CONFIG_BT_NIMBLE_ROLE_PERIPHERAL=n
+CONFIG_BT_NIMBLE_GATT_SERVER=n
+CONFIG_BT_NIMBLE_GATT_CLIENT=n
+CONFIG_BT_NIMBLE_GAP_SERVICE=n
+
+# Security / pairing / bonding: none of it applies to a broadcast tag. We rotate
+# our own keys, so NimBLE's host-based privacy (RPA) is off too. Disabling SM
+# here is what lets the SMP layer's mbedTLS crypto (AES/CMAC/ECDH) get garbage-
+# collected out of the image.
+CONFIG_BT_NIMBLE_SECURITY_ENABLE=n
+CONFIG_BT_NIMBLE_SM_LEGACY=n
+CONFIG_BT_NIMBLE_SM_SC=n
+CONFIG_BT_NIMBLE_LL_CFG_FEAT_LE_ENCRYPTION=n
+CONFIG_BT_NIMBLE_HS_PVCY=n
+CONFIG_BT_NIMBLE_MAX_CONNECTIONS=0
+
+# Legacy advertising only. Apple Find My / OpenHaystack beacons use legacy adv,
+# so the BT 5.0 extended/2M/coded-PHY machinery is dead weight here.
+CONFIG_BT_NIMBLE_50_FEATURE_SUPPORT=n
+CONFIG_BT_NIMBLE_LL_CFG_FEAT_LE_2M_PHY=n
+CONFIG_BT_NIMBLE_LL_CFG_FEAT_LE_CODED_PHY=n
+
+# Keep NimBLE's crypto routed through mbedTLS even with security disabled.
+# Otherwise NimBLE falls back to its bundled TinyCrypt, whose ecc.c exports the
+# same uECC_* symbol names as the vendored micro-ecc component and the link
+# fails with "multiple definition of uECC_*". (Depends only on BT_NIMBLE_ENABLED.)
+CONFIG_BT_NIMBLE_CRYPTO_STACK_MBEDTLS=y
+
+# Test/debug surface
+CONFIG_BT_NIMBLE_DTM_MODE_TEST=n
+CONFIG_BT_NIMBLE_LOG_LEVEL_NONE=y
+
+# ── BLE controller (precompiled blob — these mostly free internal RAM) ───────
+CONFIG_BT_CTRL_BLE_ADV=y
+CONFIG_BT_CTRL_BLE_SCAN=n
+CONFIG_BT_CTRL_BLE_MASTER=n
+CONFIG_BT_CTRL_BLE_SECURITY_ENABLE=n
+CONFIG_BT_CTRL_DTM_ENABLE=n
+CONFIG_BT_CTRL_LE_PING_EN=n
+CONFIG_BT_CTRL_BLE_SCAN_DUPL=n
+CONFIG_BT_CTRL_BLE_MAX_ACT=1
+
+# ── mbedTLS: keep only what crypto.c uses (SHA-256 + bignum/MPI) ──────────────
+# NOTE: these cuts mainly save BUILD TIME and guarantee unused code stays out;
+# they reclaim ~0 flash on their own, because gc-sections already drops anything
+# unreferenced. We do NOT touch AES/CMAC/ECDH/ECP primitives — if referenced by
+# NimBLE's SMP they must stay, and if not, gc already removes them.
+CONFIG_MBEDTLS_TLS_ENABLED=n
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=n
+CONFIG_MBEDTLS_ERROR_STRINGS=n
+CONFIG_MBEDTLS_SELF_TEST=n
+CONFIG_MBEDTLS_FS_IO=n
+CONFIG_MBEDTLS_HAVE_TIME=n
+
+# ── Logging ──────────────────────────────────────────────────────────────────
+# Default every tag to WARN-and-above to keep the noisy IDF/NimBLE/controller
+# components quiet. The maximum level is raised to VERBOSE so that our own tags
+# (main, ble_adv, crypto, tag, nvs_store) can be opened up to full verbosity at
+# runtime via esp_log_level_set() in app_main — without VERBOSE compiled in,
+# those calls could not raise past the default.
+CONFIG_LOG_DEFAULT_LEVEL_WARN=y
+CONFIG_LOG_MAXIMUM_LEVEL_VERBOSE=y
+
+# The 2nd-stage bootloader runs before app_main and is governed by its own
+# compile-time level (not esp_log_level_set), so quiet it to WARN as well.
+CONFIG_BOOTLOADER_LOG_LEVEL_WARN=y
