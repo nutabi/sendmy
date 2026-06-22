@@ -9,6 +9,11 @@
 
 static const char *TAG = "sendmy_carrier";
 
+#define SM_CR_HMAC_LEN 32
+
+_Static_assert(SM_CR_CID_LEN <= SM_CR_HMAC_LEN,
+               "CID must fit in a single HMAC-SHA256 block");
+
 static const uint8_t SM_CR_INFO[SM_CR_INFO_LEN] = { 0x73, 0x6D, 0x76, 0x31 };
 
 /*
@@ -109,7 +114,7 @@ static esp_err_t hkdf_expand_single(const uint8_t  prk[SM_CR_UID_LEN],
         goto cleanup_op;
     }
 
-    uint8_t t1[32];
+    uint8_t t1[SM_CR_HMAC_LEN];
     size_t mac_len;
     status = psa_mac_sign_finish(&op, t1, sizeof(t1), &mac_len);
     if (status != PSA_SUCCESS) {
