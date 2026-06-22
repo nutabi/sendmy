@@ -71,6 +71,15 @@ static esp_err_t adv_apply(const uint8_t key[SM_LL_KEY_LEN]);
  */
 
 esp_err_t sm_ll_init(void (*on_ready)(void), uint32_t adv_interval_ms) {
+    // BLE advertising uses 0.625 ms units; valid HCI range is 0x20..0x4000,
+    // i.e. 20..10240 ms. Out-of-range values convert to an out-of-spec interval
+    // and advertising would silently fail to start.
+    if (adv_interval_ms < 20 || adv_interval_ms > 10240) {
+        ESP_LOGE(TAG, "adv_interval_ms %lu out of range [20, 10240]",
+                 (unsigned long)adv_interval_ms);
+        return ESP_ERR_INVALID_ARG;
+    }
+
     s_on_ready = on_ready;
     s_adv_interval_ms = adv_interval_ms;
 
