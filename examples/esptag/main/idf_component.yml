@@ -3,12 +3,3 @@ dependencies:
   # against the in-tree component source.
   sendmy_link:
     path: ../../../sendmy_link
-  # Genuinely external deps (BME680 sensor stack) stay pinned by git tag.
-  i2c_bus:
-    git: https://github.com/nutabi/esp-bme680.git
-    path: i2c_bus
-    version: "v1.0.1"
-  bme680:
-    git: https://github.com/nutabi/esp-bme680.git
-    path: bme680
-    version: "v1.0.1"

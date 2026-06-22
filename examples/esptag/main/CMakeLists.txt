@@ -1,7 +1,7 @@
 idf_component_register(
     SRC_DIRS "."
     INCLUDE_DIRS "."
-    REQUIRES micro_ecc mbedtls esp_hw_support nvs_flash bt sendmy_link i2c_bus bme680
+    REQUIRES micro_ecc mbedtls esp_hw_support nvs_flash bt sendmy_link
 )
 
 # Secret-scrubbing (mbedtls_platform_zeroize of all intermediate key material on
