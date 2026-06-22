@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the 32-byte Unilink ID (UID), the sendmy transport's root secret.
+"""Generate the 32-byte Unilink ID (UID), the sendmy carrier's root secret.
 
 The UID is the single pre-shared secret of the whole design: the sender and the
 receiver both hold it, and it is the HKDF pseudorandom key from which every
