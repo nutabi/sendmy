@@ -1,27 +1,4 @@
 #!/usr/bin/env python3
-"""Recover one espsend payload octet from Apple's Find My network.
-
-This is the receiver. For a given message_id it derives all 256 candidate
-carriers from the shared Unilink ID (UID), asks Apple whether a Find My report
-exists for each, and prints the payload octet of the one that does. The
-existence of a carrier is the signal; its identity (the appended payload byte)
-is the recovered value.
-
-Carrier derivation (mirrors components/sendmy):
-
-    carrier_id = HKDF-Expand(PRK=uid, info="smv1" || mid_be32, L=27)
-    carrier    = carrier_id || payload          # payload in 0x00..0xFF
-    lookup     = SHA-256(carrier)               # Find My report key
-
-The UID is read from uid.hex at the project root (64 hex chars = 32 bytes).
-Authentication reuses the provisioned local session in scripts/account.json with
-the bundled anisette libraries in scripts/anisette-libs.bin -- no login needed.
-
-Usage:
-    fetch_reports.py [message_id]      # message_id defaults to 0
-
-Requires: findmy (FindMy.py).
-"""
 
 from __future__ import annotations
 
@@ -45,8 +22,6 @@ CID_LEN = 27
 
 
 class Carrier(HasHashedPublicKey):
-    """A candidate carrier, queryable by SHA-256 of its 28 bytes."""
-
     def __init__(self, carrier: bytes, payload: int) -> None:
         self._hash = hashlib.sha256(carrier).digest()
         self.payload = payload
