@@ -128,6 +128,7 @@ esp_err_t sm_ll_set_key(const uint8_t key[SM_LL_KEY_LEN]) {
 
 static void on_reset(int reason) {
     ESP_LOGW(TAG, "nimble host reset, reason=%d", reason);
+    s_synced = false;
 }
 
 static void on_sync(void) {
