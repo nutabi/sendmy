@@ -3,7 +3,6 @@
 #include <string.h>
 
 #include "esp_log.h"
-#include "esp_random.h"
 
 #include "nimble/nimble_npl.h"
 #include "nimble/nimble_port.h"
@@ -189,7 +188,7 @@ static void build_payload(const uint8_t key[SM_LL_KEY_LEN],
                           ble_adv_payload_t *out) {
     out->of_type = 0x12;
     out->of_len = 25;
-    out->status = (uint8_t)esp_random();
+    out->status = 0x00;
     memcpy(out->key_mid, &key[6], sizeof(out->key_mid));
     out->key_hi = key[0] >> 6;
     out->hint = 0;
