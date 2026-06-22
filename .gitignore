@@ -1,0 +1,11 @@
+# Claude instruction/memory (local-only dev guidance)
+.claude/
+CLAUDE.md
+
+# CMake build (standalone component builds / consuming examples)
+build/
+.cache/
+managed_components/
+
+# MacOS
+.DS_Store
