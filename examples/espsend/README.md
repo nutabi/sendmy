@@ -67,6 +67,17 @@ scripts/.venv/bin/python scripts/fetch_reports.py --message-id 3
 Apple keeps reports for seven days, so you can fetch old messages well after the
 fact.
 
+`scripts/check_carriers.py` is an offline deliverability check. A finder only
+files a report for a carrier that is a valid P-224 point, and roughly half of
+carriers are not (see the carrier component's README). Given the same `uid.hex`,
+it walks the carriers the firmware sends and flags which mids are deliverable, so
+a "no carrier present" result from `fetch_reports.py` can be told apart from a
+real bug.
+
+```sh
+scripts/.venv/bin/python scripts/check_carriers.py 15   # check mid 0..15
+```
+
 `scripts/scan_findmy.py` is a local BLE scanner for sanity-checking that the
 device is actually broadcasting before you wait on Apple's servers. It parses
 the OF frame and reconstructs the advertised key.
