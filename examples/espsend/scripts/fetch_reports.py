@@ -18,7 +18,7 @@ ACCOUNT_FILE = SCRIPT_DIR / "account.json"
 ANISETTE_LIBS = SCRIPT_DIR / "anisette-libs.bin"
 
 INFO = b"smv1"  # 0x73 0x6D 0x76 0x31, the sendmy HKDF info prefix
-CID_LEN = 27
+CARRIER_LEN = 28
 
 
 class Carrier(HasHashedPublicKey):
@@ -43,9 +43,9 @@ def hkdf_expand(prk: bytes, info: bytes, length: int) -> bytes:
     return out[:length]
 
 
-def carrier_id(uid: bytes, mid: int) -> bytes:
-    info = INFO + mid.to_bytes(4, "big")
-    return hkdf_expand(uid, info, CID_LEN)
+def build_carrier(uid: bytes, mid: int, payload: int) -> bytes:
+    info = INFO + mid.to_bytes(4, "big") + bytes([payload])
+    return hkdf_expand(uid, info, CARRIER_LEN)
 
 
 def read_uid() -> bytes:
@@ -77,10 +77,9 @@ def main() -> None:
         sys.exit("error: message_id must fit in a 32-bit unsigned integer")
 
     uid = read_uid()
-    cid = carrier_id(uid, args.message_id)
 
-    # 256 candidates: carrier_id with every possible payload octet appended.
-    candidates = [Carrier(cid + bytes([p]), p) for p in range(256)]
+    # 256 candidates: one full carrier derived per possible payload octet.
+    candidates = [Carrier(build_carrier(uid, args.message_id, p), p) for p in range(256)]
 
     account = load_account()
     results = account.fetch_location(candidates)

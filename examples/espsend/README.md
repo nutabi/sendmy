@@ -13,11 +13,11 @@ seconds before moving on. The payload is `1 << (mid % 8)`, so it walks a single
 one-hot bit, `0x01 0x02 0x04 ... 0x80`, repeating every eight messages.
 
 ```
-mid=0  payload=0x01  carrier = CID(uid, 0) || 0x01   advertised 60s
-mid=1  payload=0x02  carrier = CID(uid, 1) || 0x02   advertised 60s
+mid=0  payload=0x01  carrier = HKDF(uid, 0, 0x01)[:28]   advertised 60s
+mid=1  payload=0x02  carrier = HKDF(uid, 1, 0x02)[:28]   advertised 60s
 ...
-mid=7  payload=0x80  carrier = CID(uid, 7) || 0x80   advertised 60s
-mid=8  payload=0x01  (new CID)                        advertised 60s
+mid=7  payload=0x80  carrier = HKDF(uid, 7, 0x80)[:28]   advertised 60s
+mid=8  payload=0x01  carrier = HKDF(uid, 8, 0x01)[:28]   advertised 60s
 ```
 
 The 60-second window is deliberately short so the demo is watchable. A real
@@ -53,9 +53,10 @@ idf.py flash monitor
 ## Host-side scripts
 
 `scripts/fetch_reports.py` is the receiver. Given a message ID it builds all 256
-candidate carriers (`CID || 0x00` through `CID || 0xFF`), hashes each with
-SHA-256, and queries Apple's location endpoint; the hash that comes back with a
-report is the transmitted byte, printed as two hex chars so you can pipe it.
+candidate carriers, one per possible payload octet (`HKDF(uid, mid, 0x00)`
+through `HKDF(uid, mid, 0xFF)`), hashes each with SHA-256, and queries Apple's
+location endpoint; the hash that comes back with a report is the transmitted
+byte, printed as two hex chars so you can pipe it.
 
 ```sh
 # first run logs in and saves the session to account.json
