@@ -8,6 +8,7 @@ import hmac
 import sys
 from pathlib import Path
 
+from cryptography.hazmat.primitives.asymmetric import ec
 from findmy.keys import HasHashedPublicKey
 from findmy.reports import AppleAccount
 
@@ -19,6 +20,9 @@ ANISETTE_LIBS = SCRIPT_DIR / "anisette-libs.bin"
 
 INFO = b"smv1"  # 0x73 0x6D 0x76 0x31, the sendmy HKDF info prefix
 CARRIER_LEN = 28
+
+# secp224r1 (NIST P-224) group order n. The carrier scalar must lie in [1, n-1].
+N = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFF16A2E0B8F03E13DD29455C5C2A3D
 
 
 class Carrier(HasHashedPublicKey):
@@ -44,8 +48,24 @@ def hkdf_expand(prk: bytes, info: bytes, length: int) -> bytes:
 
 
 def build_carrier(uid: bytes, mid: int, payload: int) -> bytes:
-    info = INFO + mid.to_bytes(4, "big") + bytes([payload])
-    return hkdf_expand(uid, info, CARRIER_LEN)
+    """Derive the 28-byte carrier the firmware advertises for (uid, mid, payload).
+
+    Mirrors sendmy_carrier's compute_carrier: build the HKDF info
+    ("smv1" || mid_be32 || payload || attempt), expand it to a 28-byte block,
+    interpret that as a big-endian scalar d, and accept the first attempt whose
+    d lands in [1, n-1] (rejection sampling; in practice attempt is always 0).
+    The carrier is the big-endian x-coordinate of d*G, so it is always a valid
+    secp224r1 point and Find My never drops it.
+    """
+    for attempt in range(256):
+        info = INFO + mid.to_bytes(4, "big") + bytes([payload, attempt])
+        d = int.from_bytes(hkdf_expand(uid, info, CARRIER_LEN), "big")
+        if 1 <= d < N:
+            x = ec.derive_private_key(d, ec.SECP224R1()).public_key().public_numbers().x
+            return x.to_bytes(CARRIER_LEN, "big")
+    raise RuntimeError(
+        f"no valid P-224 scalar after 256 attempts (mid={mid}, payload={payload})"
+    )
 
 
 def read_uid() -> bytes:

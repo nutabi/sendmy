@@ -1,5 +1,7 @@
 #include "sendmy_carrier.h"
 
+#include "p224.h"
+
 #include "esp_err.h"
 #include "esp_log.h"
 #include "mbedtls/platform_util.h"
@@ -13,6 +15,9 @@ static const char *TAG = "sendmy_carrier";
 
 _Static_assert(SM_CR_CARRIER_LEN <= SM_CR_HMAC_LEN,
                "carrier must fit in a single HMAC-SHA256 block");
+
+_Static_assert(SM_CR_CARRIER_LEN == P224_LEN,
+               "carrier is the 28-byte x-coordinate of a P-224 point");
 
 static const uint8_t SM_CR_INFO[SM_CR_INFO_LEN] = {0x73, 0x6D, 0x76, 0x31};
 
@@ -128,8 +133,13 @@ cleanup_key:
 static esp_err_t compute_carrier(const uint8_t uid[SM_CR_UID_LEN], uint32_t mid, uint8_t payload,
                                  uint8_t carrier[SM_CR_CARRIER_LEN])
 {
-    // info = "smv1" || mid_be32 || payload
-    uint8_t info[SM_CR_INFO_LEN + 4 + 1];
+    // info = "smv1" || mid_be32 || payload || attempt
+    //
+    // The attempt byte is always present (even on the first, almost-always-taken
+    // iteration). Each iteration derives a fresh 28-byte block, interprets it as
+    // a big-endian scalar d, and keeps it only if d lands in the valid P-224
+    // range [1, n-1]. P(reject) ~ 2^-112, so in practice the loop never spins.
+    uint8_t info[SM_CR_INFO_LEN + 4 + 2];
     memcpy(info, SM_CR_INFO, SM_CR_INFO_LEN);
     info[SM_CR_INFO_LEN + 0] = (mid >> 24) & 0xFF;
     info[SM_CR_INFO_LEN + 1] = (mid >> 16) & 0xFF;
@@ -137,5 +147,34 @@ static esp_err_t compute_carrier(const uint8_t uid[SM_CR_UID_LEN], uint32_t mid,
     info[SM_CR_INFO_LEN + 3] = (mid >> 0) & 0xFF;
     info[SM_CR_INFO_LEN + 4] = payload;
 
-    return hkdf_expand_single(uid, info, sizeof(info), carrier);
+    uint8_t block[SM_CR_CARRIER_LEN];
+    esp_err_t status = ESP_FAIL;
+
+    // attempt is a single byte, so it can take at most 256 distinct values.
+    for (unsigned attempt = 0; attempt <= 0xFF; attempt++) {
+        info[SM_CR_INFO_LEN + 5] = (uint8_t)attempt;
+
+        status = hkdf_expand_single(uid, info, sizeof(info), block);
+        if (status != ESP_OK) {
+            // hkdf_expand_single already logged the underlying failure.
+            goto cleanup;
+        }
+
+        if (p224_scalar_in_range(block)) {
+            // block is a valid scalar d; the carrier is X(d*G).
+            status = p224_base_mult_x(block, carrier);
+            goto cleanup;
+        }
+
+        ESP_LOGD(TAG, "scalar out of range, retrying (attempt=%u)", attempt);
+    }
+
+    // Exhausting all 256 attempts is astronomically improbable; treat as failure.
+    ESP_LOGE(TAG, "no valid P-224 scalar after 256 attempts for mid=%lu", (unsigned long)mid);
+    status = ESP_FAIL;
+
+cleanup:
+    mbedtls_platform_zeroize(block, sizeof(block));
+    mbedtls_platform_zeroize(info, sizeof(info));
+    return status;
 }
