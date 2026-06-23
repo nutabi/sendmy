@@ -1,9 +1,9 @@
 #ifndef ESPTAG_CRYPTO
 #define ESPTAG_CRYPTO
 
-#include <stdint.h>
-
 #include "common.h"
+
+#include <stdint.h>
 
 // SHA-256 / KDF block length
 #define HASH_LEN 32
@@ -32,9 +32,7 @@ status_t crypto_init(void);
  * @param sk_i      Target symmetric key
  * @return          Status code
  */
-status_t crypto_advance_sk(const uint8_t sk_0[SK_LEN],
-                      uint32_t counter,
-                      uint8_t sk_i[SK_LEN]);
+status_t crypto_advance_sk(const uint8_t sk_0[SK_LEN], uint32_t counter, uint8_t sk_i[SK_LEN]);
 
 /**
  * Rotate the symmetric key once
@@ -45,8 +43,7 @@ status_t crypto_advance_sk(const uint8_t sk_0[SK_LEN],
  * @param sk_next   Next symmetric key
  * @return          Status code
  */
-status_t crypto_update_sk(const uint8_t sk_prev[SK_LEN],
-                     uint8_t sk_next[SK_LEN]);
+status_t crypto_update_sk(const uint8_t sk_prev[SK_LEN], uint8_t sk_next[SK_LEN]);
 
 /**
  * Derive advertising public scalar from private scalar and symmetric key
@@ -60,8 +57,6 @@ status_t crypto_update_sk(const uint8_t sk_prev[SK_LEN],
  * @param p_i       Compressed and stripped public scalar
  * @return          Status code
  */
-status_t crypto_derive_p(const uint8_t d_0[D_LEN],
-                    const uint8_t sk_i[SK_LEN],
-                    uint8_t p_i[P_LEN]);
+status_t crypto_derive_p(const uint8_t d_0[D_LEN], const uint8_t sk_i[SK_LEN], uint8_t p_i[P_LEN]);
 
-#endif // ESPTAG_CRYPTO
+#endif  // ESPTAG_CRYPTO

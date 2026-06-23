@@ -1,27 +1,26 @@
 #include "nvs_store.h"
 
 #include "common.h"  // D_LEN, SK_LEN
-
 #include "esp_log.h"
-
 #include "nvs.h"
 #include "nvs_flash.h"
 
 #define LOG_TAG "nvs_store"
 
 #define NVS_NAMESPACE "esptag"
-#define NVS_KEY_D0    "d_0"
-#define NVS_KEY_SK0   "sk_0"
+#define NVS_KEY_D0 "d_0"
+#define NVS_KEY_SK0 "sk_0"
 
 // Writable runtime-state namespace, kept separate from the read-only seed
 // namespace above so the seed image (flashed from seed.csv) and the mutable
 // rotation counter never share a namespace.
 #define NVS_NAMESPACE_STATE "esptag_st"
-#define NVS_KEY_COUNTER     "counter"
+#define NVS_KEY_COUNTER "counter"
 
 /* Header implementation */
 
-status_t nvs_store_init(void) {
+status_t nvs_store_init(void)
+{
     // Any failure (including a corrupt partition) is fatal: the main task
     // aborts, and recovery means re-flashing the seed anyway.
     esp_err_t err = nvs_flash_init();
@@ -34,7 +33,8 @@ status_t nvs_store_init(void) {
 
 // Read a fixed-size blob key into out, failing if the key is missing or its
 // stored length does not match.
-static status_t load_blob(nvs_handle_t handle, const char *key, void *out, size_t expected) {
+static status_t load_blob(nvs_handle_t handle, const char *key, void *out, size_t expected)
+{
     size_t len = expected;
     esp_err_t err = nvs_get_blob(handle, key, out, &len);
     if (err != ESP_OK) {
@@ -42,14 +42,14 @@ static status_t load_blob(nvs_handle_t handle, const char *key, void *out, size_
         return STATUS_ERR;
     }
     if (len != expected) {
-        ESP_LOGE(LOG_TAG, "key '%s' size mismatch (%u != %u)",
-                 key, (unsigned)len, (unsigned)expected);
+        ESP_LOGE(LOG_TAG, "key '%s' size mismatch (%u != %u)", key, (unsigned)len, (unsigned)expected);
         return STATUS_ERR;
     }
     return STATUS_OK;
 }
 
-status_t nvs_store_load_seed(uint8_t d_0[D_LEN], uint8_t sk_0[SK_LEN]) {
+status_t nvs_store_load_seed(uint8_t d_0[D_LEN], uint8_t sk_0[SK_LEN])
+{
     if (d_0 == NULL || sk_0 == NULL) {
         ESP_LOGE(LOG_TAG, "seed buffer is null");
         return STATUS_ERR;
@@ -60,8 +60,7 @@ status_t nvs_store_load_seed(uint8_t d_0[D_LEN], uint8_t sk_0[SK_LEN]) {
     if (err != ESP_OK) {
         // ESP_ERR_NVS_NOT_FOUND here means the namespace was never written:
         // the device has not been provisioned with a seed.
-        ESP_LOGE(LOG_TAG, "nvs open failed (not provisioned?): %s",
-                 esp_err_to_name(err));
+        ESP_LOGE(LOG_TAG, "nvs open failed (not provisioned?): %s", esp_err_to_name(err));
         return STATUS_ERR;
     }
 
@@ -75,7 +74,8 @@ status_t nvs_store_load_seed(uint8_t d_0[D_LEN], uint8_t sk_0[SK_LEN]) {
     return ret;
 }
 
-status_t nvs_store_load_counter(uint32_t *counter) {
+status_t nvs_store_load_counter(uint32_t *counter)
+{
     if (counter == NULL) {
         ESP_LOGE(LOG_TAG, "counter is null");
         return STATUS_ERR;
@@ -107,7 +107,8 @@ status_t nvs_store_load_counter(uint32_t *counter) {
     return STATUS_OK;
 }
 
-status_t nvs_store_save_counter(uint32_t counter) {
+status_t nvs_store_save_counter(uint32_t counter)
+{
     nvs_handle_t handle;
     esp_err_t err = nvs_open(NVS_NAMESPACE_STATE, NVS_READWRITE, &handle);
     if (err != ESP_OK) {

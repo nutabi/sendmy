@@ -1,9 +1,9 @@
 #ifndef ESPTAG_TAG
 #define ESPTAG_TAG
 
-#include <stdint.h>
-
 #include "common.h"  // D_LEN, SK_LEN, P_LEN
+
+#include <stdint.h>
 
 /*
  * Secret-bearing runtime state for one tag.
@@ -17,12 +17,12 @@
  * derive by hand. tag_destroy() zeroizes the whole struct.
  */
 typedef struct {
-    uint8_t         d_0[D_LEN];         // Seed private scalar (from NVS)
-    uint8_t         sk_0[SK_LEN];       // Seed symmetric key (from NVS)
+    uint8_t d_0[D_LEN];    // Seed private scalar (from NVS)
+    uint8_t sk_0[SK_LEN];  // Seed symmetric key (from NVS)
 
-    uint8_t         sk_curr[SK_LEN];    // Ratchet key at the current epoch
-    uint32_t        counter;            // Current epoch / ratchet step count
-    uint8_t         p_curr[P_LEN];      // Advertising key for the current epoch
+    uint8_t sk_curr[SK_LEN];  // Ratchet key at the current epoch
+    uint32_t counter;         // Current epoch / ratchet step count
+    uint8_t p_curr[P_LEN];    // Advertising key for the current epoch
 } tag_t;
 
 /**
@@ -65,4 +65,4 @@ status_t tag_rotate(tag_t *tag);
  */
 status_t tag_destroy(tag_t *tag);
 
-#endif // ESPTAG_TAG
+#endif  // ESPTAG_TAG

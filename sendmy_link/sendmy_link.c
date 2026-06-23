@@ -1,15 +1,14 @@
 #include "sendmy_link.h"
 
-#include <string.h>
-
 #include "esp_log.h"
-
+#include "host/ble_gap.h"
+#include "host/ble_hs.h"
+#include "host/ble_hs_id.h"
 #include "nimble/nimble_npl.h"
 #include "nimble/nimble_port.h"
 #include "nimble/nimble_port_freertos.h"
-#include "host/ble_hs.h"
-#include "host/ble_hs_id.h"
-#include "host/ble_gap.h"
+
+#include <string.h>
 
 static const char *TAG = "sendmy_link";
 
@@ -57,8 +56,7 @@ static bool s_ready_called = false;
 static void on_reset(int reason);
 static void on_sync(void);
 static void host_task(void *param);
-static void build_payload(const uint8_t key[SM_LL_KEY_LEN],
-                          ble_adv_payload_t *out);
+static void build_payload(const uint8_t key[SM_LL_KEY_LEN], ble_adv_payload_t *out);
 static void build_addr(const uint8_t key[SM_LL_KEY_LEN], uint8_t addr[6]);
 static void apply_ev_cb(struct ble_npl_event *ev);
 static esp_err_t adv_apply(const uint8_t key[SM_LL_KEY_LEN]);
@@ -69,21 +67,20 @@ static esp_err_t adv_apply(const uint8_t key[SM_LL_KEY_LEN]);
  * ----------------------------------------------------------------------------
  */
 
-esp_err_t sm_ll_init(void (*on_ready)(void), uint32_t adv_interval_ms) {
+esp_err_t sm_ll_init(void (*on_ready)(void), uint32_t adv_interval_ms)
+{
     // BLE advertising uses 0.625 ms units; valid HCI range is 0x20..0x4000,
     // i.e. 20..10240 ms. Out-of-range values convert to an out-of-spec interval
     // and advertising would silently fail to start.
     if (adv_interval_ms < 20 || adv_interval_ms > 10240) {
-        ESP_LOGE(TAG, "adv_interval_ms %lu out of range [20, 10240]",
-                 (unsigned long)adv_interval_ms);
+        ESP_LOGE(TAG, "adv_interval_ms %lu out of range [20, 10240]", (unsigned long)adv_interval_ms);
         return ESP_ERR_INVALID_ARG;
     }
 
     s_on_ready = on_ready;
     s_adv_interval_ms = adv_interval_ms;
 
-    ESP_LOGI(TAG, "initialising Find My advertising (interval %lu ms)",
-             (unsigned long)adv_interval_ms);
+    ESP_LOGI(TAG, "initialising Find My advertising (interval %lu ms)", (unsigned long)adv_interval_ms);
 
     esp_err_t err = nimble_port_init();
     if (err != ESP_OK) {
@@ -103,7 +100,8 @@ esp_err_t sm_ll_init(void (*on_ready)(void), uint32_t adv_interval_ms) {
     return ESP_OK;
 }
 
-esp_err_t sm_ll_set_key(const uint8_t key[SM_LL_KEY_LEN]) {
+esp_err_t sm_ll_set_key(const uint8_t key[SM_LL_KEY_LEN])
+{
     if (key == NULL) {
         ESP_LOGE(TAG, "key is null");
         return ESP_ERR_INVALID_ARG;
@@ -134,12 +132,14 @@ esp_err_t sm_ll_set_key(const uint8_t key[SM_LL_KEY_LEN]) {
  * ----------------------------------------------------------------------------
  */
 
-static void on_reset(int reason) {
+static void on_reset(int reason)
+{
     ESP_LOGW(TAG, "nimble host reset, reason=%d", reason);
     s_synced = false;
 }
 
-static void on_sync(void) {
+static void on_sync(void)
+{
     ESP_LOGI(TAG, "nimble host synced");
     s_synced = true;
 
@@ -161,7 +161,8 @@ static void on_sync(void) {
     }
 }
 
-static void apply_ev_cb(struct ble_npl_event *ev) {
+static void apply_ev_cb(struct ble_npl_event *ev)
+{
     (void)ev;
 
     uint8_t key[SM_LL_KEY_LEN];
@@ -178,14 +179,15 @@ static void apply_ev_cb(struct ble_npl_event *ev) {
     }
 }
 
-static void host_task(void *param) {
+static void host_task(void *param)
+{
     ESP_LOGI(TAG, "nimble host task started");
     nimble_port_run();
     nimble_port_freertos_deinit();
 }
 
-static void build_payload(const uint8_t key[SM_LL_KEY_LEN],
-                          ble_adv_payload_t *out) {
+static void build_payload(const uint8_t key[SM_LL_KEY_LEN], ble_adv_payload_t *out)
+{
     out->of_type = 0x12;
     out->of_len = 25;
     out->status = 0x00;
@@ -194,14 +196,16 @@ static void build_payload(const uint8_t key[SM_LL_KEY_LEN],
     out->hint = 0;
 }
 
-static void build_addr(const uint8_t key[SM_LL_KEY_LEN], uint8_t addr[6]) {
+static void build_addr(const uint8_t key[SM_LL_KEY_LEN], uint8_t addr[6])
+{
     for (int i = 0; i < 6; i++) {
         addr[i] = key[5 - i];
     }
     addr[5] |= 0xC0;
 }
 
-static esp_err_t adv_apply(const uint8_t key[SM_LL_KEY_LEN]) {
+static esp_err_t adv_apply(const uint8_t key[SM_LL_KEY_LEN])
+{
     int rc = ble_gap_adv_stop();
     if (rc != 0 && rc != BLE_HS_EALREADY) {
         ESP_LOGW(TAG, "adv stop returned %d", rc);
@@ -232,15 +236,13 @@ static esp_err_t adv_apply(const uint8_t key[SM_LL_KEY_LEN]) {
         .itvl_min = BLE_GAP_ADV_ITVL_MS(s_adv_interval_ms),
         .itvl_max = BLE_GAP_ADV_ITVL_MS(s_adv_interval_ms),
     };
-    rc = ble_gap_adv_start(BLE_OWN_ADDR_RANDOM, NULL, BLE_HS_FOREVER, &params,
-                           NULL, NULL);
+    rc = ble_gap_adv_start(BLE_OWN_ADDR_RANDOM, NULL, BLE_HS_FOREVER, &params, NULL, NULL);
     if (rc != 0) {
         ESP_LOGE(TAG, "adv start failed: %d", rc);
         return ESP_FAIL;
     }
 
-    ESP_LOGI(TAG, "advertising as %02X:%02X:%02X:%02X:%02X:%02X",
-             addr[5], addr[4], addr[3], addr[2], addr[1], addr[0]);
+    ESP_LOGI(TAG, "advertising as %02X:%02X:%02X:%02X:%02X:%02X", addr[5], addr[4], addr[3], addr[2], addr[1], addr[0]);
     ESP_LOG_BUFFER_HEX_LEVEL(TAG, data, sizeof(data), ESP_LOG_DEBUG);
     return ESP_OK;
 }

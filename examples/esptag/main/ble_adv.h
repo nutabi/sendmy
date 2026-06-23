@@ -23,4 +23,4 @@
  */
 status_t ble_adv_init(tag_t *tag);
 
-#endif // ESPTAG_BLE_ADV
+#endif  // ESPTAG_BLE_ADV

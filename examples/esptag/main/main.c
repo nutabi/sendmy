@@ -1,12 +1,11 @@
-#include <stdlib.h>
-
-#include "esp_log.h"
-#include "sdkconfig.h"
-
 #include "ble_adv.h"
 #include "crypto.h"
+#include "esp_log.h"
 #include "nvs_store.h"
+#include "sdkconfig.h"
 #include "tag.h"
+
+#include <stdlib.h>
 
 #define LOG_TAG "main"
 
@@ -22,10 +21,10 @@ static const char *const OWN_LOG_TAGS[] = {
     "main", "crypto", "nvs_store", "tag", "ble_adv", "sendmy_link",
 };
 
-void app_main(void) {
+void app_main(void)
+{
     for (size_t i = 0; i < sizeof(OWN_LOG_TAGS) / sizeof(OWN_LOG_TAGS[0]); i++) {
-        esp_log_level_set(OWN_LOG_TAGS[i],
-                          (esp_log_level_t)CONFIG_ESPTAG_OWN_LOG_LEVEL);
+        esp_log_level_set(OWN_LOG_TAGS[i], (esp_log_level_t)CONFIG_ESPTAG_OWN_LOG_LEVEL);
     }
 
     if (crypto_init() != STATUS_OK) {
@@ -52,7 +51,7 @@ void app_main(void) {
         ESP_LOGE(LOG_TAG, "counter load failed");
         abort();
     }
-#endif // CONFIG_ESPTAG_PERSIST_COUNTER
+#endif  // CONFIG_ESPTAG_PERSIST_COUNTER
 
     if (tag_init(&tag, counter) != STATUS_OK) {
         ESP_LOGE(LOG_TAG, "tag init failed");

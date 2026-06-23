@@ -27,7 +27,7 @@
  * the sendmy_link component).
  */
 typedef enum {
-    STATUS_OK  = 0,
+    STATUS_OK = 0,
     STATUS_ERR = 1,
 } status_t;
 
@@ -35,9 +35,9 @@ typedef enum {
 #define SK_LEN 32
 
 // P-224 EC private scalar length
-#define D_LEN  28
+#define D_LEN 28
 
 // Advertising key (P-224 EC public scalar) length
-#define P_LEN  28
+#define P_LEN 28
 
-#endif // ESPTAG_COMMON
+#endif  // ESPTAG_COMMON

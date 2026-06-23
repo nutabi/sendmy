@@ -1,9 +1,9 @@
 #ifndef ESPTAG_NVS_STORE
 #define ESPTAG_NVS_STORE
 
-#include <stdint.h>
-
 #include "common.h"  // D_LEN, SK_LEN
+
+#include <stdint.h>
 
 /**
  * @brief Initialise the default NVS flash partition.
@@ -56,4 +56,4 @@ status_t nvs_store_load_counter(uint32_t *counter);
  */
 status_t nvs_store_save_counter(uint32_t counter);
 
-#endif // ESPTAG_NVS_STORE
+#endif  // ESPTAG_NVS_STORE

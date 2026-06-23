@@ -1,14 +1,12 @@
-#include <string.h>
-
+#include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-
-#include "esp_log.h"
 #include "nvs.h"
 #include "nvs_flash.h"
-
-#include "sendmy_link.h"
 #include "sendmy_carrier.h"
+#include "sendmy_link.h"
+
+#include <string.h>
 
 static const char *TAG = "espsend";
 
@@ -62,8 +60,7 @@ static void sender_task(void *arg)
 
         esp_err_t err = sm_cr_build_carrier(s_uid, mid, payload, carrier);
         if (err != ESP_OK) {
-            ESP_LOGE(TAG, "build carrier mid=%lu: %s",
-                     (unsigned long)mid, esp_err_to_name(err));
+            ESP_LOGE(TAG, "build carrier mid=%lu: %s", (unsigned long)mid, esp_err_to_name(err));
             continue;
         }
 

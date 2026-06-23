@@ -1,18 +1,17 @@
 #include "tag.h"
 
 #include "crypto.h"
+#include "esp_log.h"
+#include "mbedtls/platform_util.h"
 
 #include <string.h>
-
-#include "esp_log.h"
-
-#include "mbedtls/platform_util.h"
 
 #define LOG_TAG "tag"
 
 /* Header implementation */
 
-status_t tag_init(tag_t *tag, uint32_t counter) {
+status_t tag_init(tag_t *tag, uint32_t counter)
+{
     if (tag == NULL) {
         ESP_LOGE(LOG_TAG, "tag is null");
         return STATUS_ERR;
@@ -35,7 +34,8 @@ status_t tag_init(tag_t *tag, uint32_t counter) {
     return STATUS_OK;
 }
 
-status_t tag_rotate(tag_t *tag) {
+status_t tag_rotate(tag_t *tag)
+{
     if (tag == NULL) {
         ESP_LOGE(LOG_TAG, "tag is null");
         return STATUS_ERR;
@@ -47,7 +47,7 @@ status_t tag_rotate(tag_t *tag) {
         ESP_LOGE(LOG_TAG, "sk rotation failed");
 #ifdef CONFIG_ESPTAG_ZEROIZE
         mbedtls_platform_zeroize(sk_next, sizeof(sk_next));
-#endif // CONFIG_ESPTAG_ZEROIZE
+#endif  // CONFIG_ESPTAG_ZEROIZE
         return STATUS_ERR;
     }
 
@@ -56,7 +56,7 @@ status_t tag_rotate(tag_t *tag) {
         ESP_LOGE(LOG_TAG, "p derivation failed");
 #ifdef CONFIG_ESPTAG_ZEROIZE
         mbedtls_platform_zeroize(sk_next, sizeof(sk_next));
-#endif // CONFIG_ESPTAG_ZEROIZE
+#endif  // CONFIG_ESPTAG_ZEROIZE
         return STATUS_ERR;
     }
 
@@ -65,11 +65,12 @@ status_t tag_rotate(tag_t *tag) {
     tag->counter++;
 #ifdef CONFIG_ESPTAG_ZEROIZE
     mbedtls_platform_zeroize(sk_next, sizeof(sk_next));
-#endif // CONFIG_ESPTAG_ZEROIZE
+#endif  // CONFIG_ESPTAG_ZEROIZE
     return STATUS_OK;
 }
 
-status_t tag_destroy(tag_t *tag) {
+status_t tag_destroy(tag_t *tag)
+{
     if (tag == NULL) {
         ESP_LOGE(LOG_TAG, "tag is null");
         return STATUS_ERR;
@@ -77,6 +78,6 @@ status_t tag_destroy(tag_t *tag) {
 
 #ifdef CONFIG_ESPTAG_ZEROIZE
     mbedtls_platform_zeroize(tag, sizeof(*tag));
-#endif // CONFIG_ESPTAG_ZEROIZE
+#endif  // CONFIG_ESPTAG_ZEROIZE
     return STATUS_OK;
 }
