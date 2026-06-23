@@ -1,8 +1,7 @@
 # Component `sendmy_link`
 
 `sendmy_link` is the link layer of `sendmy`. It takes an arbitrary 28-byte
-sequence and broadcasts it as a valid Offline Finding (OF) advertisement, the
-same kind of BLE frame a "lost" Apple device emits.
+sequence and broadcasts it as a valid Offline Finding (OF) advertisement.
 
 The component is a thin wrapper around NimBLE configured as a non-connectable,
 non-discoverable broadcaster.

@@ -1,9 +1,7 @@
 # Component `sendmy_carrier`
 
 `sendmy_carrier` is the carrier layer of `sendmy`. It turns a one-byte message
-into a 28-byte sequence that just so happens to be the size of a Find My
-advertising key, so the output drops straight into `sendmy_link`. Only `espsend`
-uses it; `esptag` talks to `sendmy_link` directly.
+into a 28-byte sequence that fits in `sendmy_link` payload.
 
 ## The format
 
@@ -20,12 +18,8 @@ The first 27 bytes are the *Carrier ID* (CID). This is exactly the first `T(1)`
 block of HKDF-Expand (RFC 5869) with `uid` as the pseudorandom key, truncated to
 27 bytes. The 28th byte is the payload, appended verbatim.
 
-Because the CID is a pseudorandom function of `(uid, mid)`, a carrier reveals
-nothing without `uid`: two carriers for the same `mid` differ only in the last
-byte, and two carriers for different `mid` values look entirely unrelated. A
-receiver who knows `uid` recomputes the CID for a given `mid`, forms all 256
-candidate carriers, and asks Apple which one was seen; that answer is the
-transmitted byte.
+By querying 256 potential reports, the existence of a report implies the
+payload attached.
 
 ## API
 
