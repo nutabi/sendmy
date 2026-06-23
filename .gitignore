@@ -2,6 +2,9 @@
 .claude/
 CLAUDE.md
 
+# Clang-Format build
+.clangd
+
 # CMake build (standalone component builds / consuming examples)
 build/
 .cache/

@@ -1,0 +1,75 @@
+# .clang-format — C style based on LLVM
+# Indent: 4 spaces | Column limit: 120 | Braces: K&R
+
+BasedOnStyle: LLVM
+Language: C
+
+# Indentation
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ContinuationIndentWidth: 4
+
+# Column limit
+ColumnLimit: 100
+
+# Braces — K&R style
+BreakBeforeBraces: Linux   # K&R for functions; Attach for control flow
+
+# Brace wrapping overrides (fine-tuning K&R)
+BraceWrapping:
+  AfterCaseLabel: false
+  AfterControlStatement: Never   # if/for/while: brace on same line
+  AfterEnum: false
+  AfterFunction: true            # function body: brace on new line
+  AfterStruct: false
+  AfterUnion: false
+  BeforeElse: false              # } else { on same line
+  IndentBraces: false
+  SplitEmptyFunction: false
+  SplitEmptyRecord: false
+
+# Spacing
+SpaceBeforeParens: ControlStatements   # space before ( in if/for/while, not in calls
+SpaceInEmptyParentheses: false
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+SpaceAfterCStyleCast: false
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeCpp11BracedList: false
+
+# Pointer alignment
+PointerAlignment: Right   # int *p (LLVM default)
+
+# Alignment
+AlignAfterOpenBracket: Align
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+AlignEscapedNewlines: Left
+AlignOperands: true
+AlignTrailingComments: true
+
+# Short constructs — keep on one line or not
+AllowShortBlocksOnASingleLine: Never
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+
+# Line breaking
+BinPackArguments: true
+BinPackParameters: true
+BreakBeforeBinaryOperators: None
+BreakBeforeTernaryOperators: true
+BreakStringLiterals: true
+
+# Include sorting
+SortIncludes: CaseSensitive
+IncludeBlocks: Regroup
+
+# Miscellaneous
+MaxEmptyLinesToKeep: 1
+KeepEmptyLinesAtTheStartOfBlocks: false
+ReflowComments: true
+SpacesBeforeTrailingComments: 2
+IndentCaseLabels: false
