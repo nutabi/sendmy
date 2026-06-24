@@ -115,6 +115,9 @@ static esp_err_t hkdf_expand_single(const uint8_t prk[SM_CR_UID_LEN], const uint
     status = psa_mac_sign_finish(&op, t1, sizeof(t1), &mac_len);
     if (status != PSA_SUCCESS) {
         ESP_LOGE(TAG, "psa_mac_sign_finish failed: %d", (int)status);
+        // psa_mac_sign_finish may have written part of t1 before failing; scrub
+        // it on the error path too, just like the success path below.
+        mbedtls_platform_zeroize(t1, sizeof(t1));
         goto cleanup_key;
     }
 
@@ -161,7 +164,12 @@ static esp_err_t compute_carrier(const uint8_t uid[SM_CR_UID_LEN], uint32_t mid,
         }
 
         if (p224_scalar_in_range(block)) {
-            // block is a valid scalar d; the carrier is X(d*G).
+            // block is a valid scalar d; the carrier is X(d*G). The multiply is
+            // intentionally variable-time: the only long-term secret is uid,
+            // which never reaches here (it feeds the constant-time PSA HMAC
+            // above). d is per-message and the resulting carrier is broadcast in
+            // the clear anyway, so leaking d through timing reveals neither uid
+            // (HKDF is one-way) nor any other message's carrier.
             status = p224_base_mult_x(block, carrier);
             goto cleanup;
         }

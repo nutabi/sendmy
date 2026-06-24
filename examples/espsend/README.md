@@ -13,11 +13,11 @@ seconds before moving on. The payload is `1 << (mid % 8)`, so it walks a single
 one-hot bit, `0x01 0x02 0x04 ... 0x80`, repeating every eight messages.
 
 ```
-mid=0  payload=0x01  carrier = HKDF(uid, 0, 0x01)[:28]   advertised 60s
-mid=1  payload=0x02  carrier = HKDF(uid, 1, 0x02)[:28]   advertised 60s
+mid=0  payload=0x01  d = HKDF(uid, 0, 0x01); carrier = X(d*G)   advertised 60s
+mid=1  payload=0x02  d = HKDF(uid, 1, 0x02); carrier = X(d*G)   advertised 60s
 ...
-mid=7  payload=0x80  carrier = HKDF(uid, 7, 0x80)[:28]   advertised 60s
-mid=8  payload=0x01  carrier = HKDF(uid, 8, 0x01)[:28]   advertised 60s
+mid=7  payload=0x80  d = HKDF(uid, 7, 0x80); carrier = X(d*G)   advertised 60s
+mid=8  payload=0x01  d = HKDF(uid, 8, 0x01); carrier = X(d*G)   advertised 60s
 ```
 
 The 60-second window is deliberately short so the demo is watchable. A real
