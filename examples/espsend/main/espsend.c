@@ -6,8 +6,6 @@
 #include "sendmy_carrier.h"
 #include "sendmy_link.h"
 
-#include <string.h>
-
 static const char *TAG = "espsend";
 
 // Test payload: octet for message_id is 2^(message_id % 8), so the values walk

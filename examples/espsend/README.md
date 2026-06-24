@@ -13,11 +13,11 @@ seconds before moving on. The payload is `1 << (mid % 8)`, so it walks a single
 one-hot bit, `0x01 0x02 0x04 ... 0x80`, repeating every eight messages.
 
 ```
-mid=0  payload=0x01  carrier = HKDF(uid, 0, 0x01)[:28]   advertised 60s
-mid=1  payload=0x02  carrier = HKDF(uid, 1, 0x02)[:28]   advertised 60s
+mid=0  payload=0x01  d = HKDF(uid, 0, 0x01); carrier = X(d*G)   advertised 60s
+mid=1  payload=0x02  d = HKDF(uid, 1, 0x02); carrier = X(d*G)   advertised 60s
 ...
-mid=7  payload=0x80  carrier = HKDF(uid, 7, 0x80)[:28]   advertised 60s
-mid=8  payload=0x01  carrier = HKDF(uid, 8, 0x01)[:28]   advertised 60s
+mid=7  payload=0x80  d = HKDF(uid, 7, 0x80); carrier = X(d*G)   advertised 60s
+mid=8  payload=0x01  d = HKDF(uid, 8, 0x01); carrier = X(d*G)   advertised 60s
 ```
 
 The 60-second window is deliberately short so the demo is watchable. A real
@@ -53,10 +53,11 @@ idf.py flash monitor
 ## Host-side scripts
 
 `scripts/fetch_reports.py` is the receiver. Given a message ID it builds all 256
-candidate carriers, one per possible payload octet (`HKDF(uid, mid, 0x00)`
-through `HKDF(uid, mid, 0xFF)`), hashes each with SHA-256, and queries Apple's
-location endpoint; the hash that comes back with a report is the transmitted
-byte, printed as two hex chars so you can pipe it.
+candidate carriers, one per possible payload octet, hashes each with SHA-256, and
+queries Apple's location endpoint; the hash that comes back with a report is the
+transmitted byte, printed as two hex chars so you can pipe it. Each candidate is
+derived exactly as the firmware does — the x-coordinate of `d*G` for a scalar `d`
+HKDF'd from `(uid, mid, payload)` — so it matches the advertised key byte-for-byte.
 
 ```sh
 # first run logs in and saves the session to account.json
@@ -67,16 +68,9 @@ scripts/.venv/bin/python scripts/fetch_reports.py --message-id 3
 Apple keeps reports for seven days, so you can fetch old messages well after the
 fact.
 
-`scripts/check_carriers.py` is an offline deliverability check. A finder only
-files a report for a carrier that is a valid P-224 point, and roughly half of
-carriers are not (see the carrier component's README). Given the same `uid.hex`,
-it walks the carriers the firmware sends and flags which mids are deliverable, so
-a "no carrier present" result from `fetch_reports.py` can be told apart from a
-real bug.
-
-```sh
-scripts/.venv/bin/python scripts/check_carriers.py 15   # check mid 0..15
-```
+Because every carrier is now `X(d*G)` — a valid P-224 point by construction — a
+"no carrier present" result from `fetch_reports.py` means the message was lost in
+transit, not that the carrier was an undeliverable point.
 
 `scripts/scan_findmy.py` is a local BLE scanner for sanity-checking that the
 device is actually broadcasting before you wait on Apple's servers. It parses
