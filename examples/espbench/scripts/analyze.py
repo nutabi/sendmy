@@ -217,6 +217,7 @@ def analyze_cell(cell: dict, tx_rows: list[dict], det_rows: list[dict], *,
         "mode": mode,
         "adv_interval_ms": int(cell.get("adv_interval_ms", 0)),
         "update_interval_ms": int(cell.get("update_interval_ms", 0)),
+        "tx_power_dbm": cell.get("tx_power_dbm"),
         "mid_base": cell["mid_base"],
         "windows": n,
         "delivered": delivered,
@@ -255,7 +256,7 @@ def analyze_cell(cell: dict, tx_rows: list[dict], det_rows: list[dict], *,
 # --------------------------------------------------------------------------- #
 
 SUMMARY_COLS = [
-    "name", "mode", "adv_interval_ms", "update_interval_ms",
+    "name", "mode", "adv_interval_ms", "update_interval_ms", "tx_power_dbm",
     "mid_base", "windows", "delivered", "correct", "deliverability",
     "correctness", "bytes_sent", "bytes_delivered", "send_seconds",
     "throughput_bps_offered", "throughput_bps_delivered",

@@ -167,4 +167,11 @@ void app_main(void)
     // Bring up NimBLE; on_ready fires after host sync. The advertising interval
     // is the key independent variable, so it comes straight from Kconfig.
     ESP_ERROR_CHECK(sm_ll_init(on_ready, CONFIG_ESPBENCH_ADV_INTERVAL_MS));
+
+#if CONFIG_ESPBENCH_TX_POWER_SET
+    // Optional second independent variable. Left unset, the controller default
+    // stands, so baseline runs are unchanged; the harness sweeps this when a
+    // cell pins tx_power_dbm. Applied post-init so the controller is up.
+    ESP_ERROR_CHECK(sm_ll_set_tx_power(CONFIG_ESPBENCH_TX_POWER_DBM));
+#endif
 }

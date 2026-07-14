@@ -138,6 +138,9 @@ def resolve_cells(matrix: dict) -> list[dict]:
         cell.setdefault("name", f"cell{i:02d}_{mode_name}")
         cell.setdefault("payload_start", 0)
         cell.setdefault("seed", 1)
+        # TX power is optional; a cell may pin its own, else inherit a
+        # matrix-wide default, else None (leave the controller default alone).
+        cell.setdefault("tx_power_dbm", matrix.get("tx_power_dbm"))
 
         if mode_name == "static":
             cell["count"] = 1
@@ -192,6 +195,7 @@ def cells_manifest(cells: list[dict], det_cfg: dict, skew_s: float,
             "duration_ms": int(c.get("duration_ms", 0)),
             "count": int(c["count"]),
             "mid_base": c["mid_base"],
+            "tx_power_dbm": c.get("tx_power_dbm"),
             "expected": [[m, p] for m, p in c["expected"]],
         } for c in cells],
     }
@@ -240,6 +244,9 @@ def write_fragment(cell: dict, path: Path) -> None:
         lines.append(f"CONFIG_ESPBENCH_MSG_COUNT={int(cell['count'])}")
     if cell["mode_int"] == bc.MODE_RANDOM:
         lines.append(f"CONFIG_ESPBENCH_RANDOM_SEED=0x{int(cell['seed']):x}")
+    if cell.get("tx_power_dbm") is not None:
+        lines.append("CONFIG_ESPBENCH_TX_POWER_SET=y")
+        lines.append(f"CONFIG_ESPBENCH_TX_POWER_DBM={int(cell['tx_power_dbm'])}")
 
     path.write_text("\n".join(lines) + "\n")
 

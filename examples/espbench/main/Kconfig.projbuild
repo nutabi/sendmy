@@ -48,6 +48,30 @@ config ESPBENCH_ADV_INTERVAL_MS
         a shorter interval means more radiated advertisements per unit time and
         more chances for a passing relay to observe the carrier.
 
+config ESPBENCH_TX_POWER_SET
+    bool "Override BLE advertising TX power"
+    default n
+    help
+        When enabled, the run applies ESPBENCH_TX_POWER_DBM to the advertising
+        radio via sm_ll_set_tx_power(). When disabled (the default), the BLE
+        controller's own default power is used and nothing is overridden, so a
+        run is directly comparable to earlier runs that predate this option.
+
+        TX power is a second independent variable for throughput/deliverability:
+        higher power widens the catch radius (more relays can hear the carrier)
+        at the cost of current draw. Sweep it alongside the advertising interval.
+
+config ESPBENCH_TX_POWER_DBM
+    int "BLE advertising TX power (dBm)"
+    depends on ESPBENCH_TX_POWER_SET
+    default 9
+    range -24 20
+    help
+        Desired advertising TX power in dBm. The controller quantises to 3 dBm
+        steps over [-24, +20], so the value is rounded to the nearest step (use
+        multiples of 3 to avoid surprises). The module/antenna may cap the
+        effective radiated power below this setting.
+
 config ESPBENCH_UPDATE_INTERVAL_MS
     int "Payload/mid update interval (ms)"
     depends on !ESPBENCH_MODE_STATIC
