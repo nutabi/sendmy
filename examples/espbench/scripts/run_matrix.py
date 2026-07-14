@@ -772,11 +772,15 @@ def main() -> None:
                 continue
 
         # Final drain: keep polling until the queue empties (every key hit its
-        # detection budget or timed out) or `settle_seconds` elapses -- so the
-        # last cell's reports and their propagation are captured too.
+        # detection budget or timed out) or the drain cap elapses. The cap is at
+        # least `lost_timeout_s`, so the last cell's key gets the same patience as
+        # any other -- a short `settle_seconds` must not cut it off before its
+        # reports (and their propagation) can land. The loop still exits the moment
+        # the queue empties, so a generous cap costs nothing once everything is in.
         if poller is not None:
-            print(f"\n=== draining poll queue (<= {settle_s:.0f}s) ===", flush=True)
-            deadline = time.time() + settle_s
+            drain_cap_s = max(settle_s, det_cfg["lost_timeout_s"])
+            print(f"\n=== draining poll queue (<= {drain_cap_s:.0f}s) ===", flush=True)
+            deadline = time.time() + drain_cap_s
             while time.time() < deadline and poller.queue_size() > 0:
                 time.sleep(min(det_cfg["poll_interval_s"], max(0.0, deadline - time.time())))
             stop_event.set()

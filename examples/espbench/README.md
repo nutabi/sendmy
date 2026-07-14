@@ -158,7 +158,7 @@ A JSON object (see `scripts/matrix.example.json`). Top-level keys:
 | Key | Default | Meaning |
 |-----|---------|---------|
 | `port` | — | serial port (or pass `--port`) |
-| `settle_seconds` | 120 | max time to keep draining the poll queue after the last cell |
+| `settle_seconds` | 120 | floor for the post-run poll-queue drain; the actual cap is `max(settle_seconds, lost_timeout_s)` so the last cell gets full patience |
 | `report_floor_skew_s` | 120 | clock-skew slack when rejecting reports older than a window's send time |
 | `mid_start` | 0 | first auto-assigned mid |
 | `mid_gap` | 100 | spare mids left between cells |
@@ -333,9 +333,11 @@ advertising-interval regression. Resolution is bounded by the poll cadence
 (measured to ±one `poll_interval_s`, biased slightly high).
 
 Because the discovery latency is derived from the report's own observation time,
-`settle_seconds` (the post-run queue-drain cap) only needs to be long enough that
-*some* report has reached the server before the poller stops — it does not bias
-the latency value. Reports keep arriving for minutes and the relay retains them
+the post-run queue-drain (capped at `max(settle_seconds, lost_timeout_s)`) only
+needs to run long enough that *some* report has reached the server before the
+poller stops — it does not bias the latency value. The drain lasts at least
+`lost_timeout_s` so the last cell's key is watched as long as any other rather
+than being cut off by a short `settle_seconds`. Reports keep arriving for minutes and the relay retains them
 for seven days, so under-settled cells can always be re-fetched later with
 `fetch_reports.py` or a fresh `analyze.py`.
 
