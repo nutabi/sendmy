@@ -6,8 +6,11 @@ __pycache__
 # Run artifacts under results/ are ignored by default because they carry sensitive
 # data: serial/console/density logs are noise, per-cell uid.hex is the device
 # secret, result.json + summary.json embed that uid, and result.json + timeseries
-# carry decrypted GPS. Only the non-sensitive aggregates are tracked.
+# carry decrypted GPS. The raw transmission.csv/detection.csv likewise embed the
+# uid (and detection.csv the decrypted GPS), so only the non-sensitive aggregates
+# and the *.public.csv redactions (uid + lat/lon stripped) are tracked.
 results/**
 !results/**/
 !results/**/summary.csv
 !results/**/density.csv
+!results/**/*.public.csv
