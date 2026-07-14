@@ -161,6 +161,7 @@ A JSON object (see `scripts/matrix.example.json`). Top-level keys:
 | `mid_gap` | 100 | spare mids left between cells |
 | `poll` | false | fetch reports *during* the run and union them (see below) |
 | `poll_interval_s` | 60 | how often to poll when `poll` is on |
+| `resweep_minutes` | `[1,3,6,10]` | post-run re-fetch delays that catch late/propagating reports (`--no-resweep` to skip; `[]` disables) |
 | `density` | true | log nearby Apple-device density during the run (`--no-density` to skip) |
 | `density_interval_s` | 60 | seconds between density snapshots |
 | `density_window_s` | 10 | scan duration per density snapshot |
@@ -191,6 +192,18 @@ For rotating cells each key is on air for one update interval, so keep
 `poll_interval_s` below half of it; static cells hold one key for the whole run,
 so any interval accumulates (a coarse interval like 300 s is plenty).
 
+### Post-run re-sweep (late reports + propagation latency)
+
+A report's server **ingestion lag can exceed a cell's `settle_seconds`**: a finder
+relays the beacon, but the report only becomes queryable minutes later — so it
+reads as LOST at capture time. After all cells finish, the harness re-fetches every
+polled cell's mids at the `resweep_minutes` delays and folds late reports into each
+store, then re-evaluates, so `deliverability` reflects the full picture. The first
+fetch that returns a report id stamps it (`first_fetched_at`); that minus the
+report's own observation timestamp is the **propagation latency** (see below).
+Poll cadence stays coarse (~30 s, under the ~60 s relay cadence) to avoid
+rate-limiting; the re-sweep is where the long tail is captured cheaply.
+
 ### Output
 
 Under `scripts/results/<timestamp>/`:
@@ -200,8 +213,10 @@ Under `scripts/results/<timestamp>/`:
   `send_seconds`, offered and delivered throughput in bytes/second, the
   discovery-latency aggregates (`latency_n`, `latency_min_s`, `latency_median_s`,
   `latency_mean_s`, `latency_max_s`), `polled` (whether report counts are true
-  totals or a capped tail), and the report-volume aggregates (`reports_total`,
-  `reports_per_delivered_mean` / `_median` / `_max`).
+  totals or a capped tail), the report-volume aggregates (`reports_total`,
+  `reports_per_delivered_mean` / `_median` / `_max`), and the propagation-latency
+  aggregates (`propagation_n`, `propagation_min_s` / `_median_s` / `_mean_s` /
+  `_max_s` — observed → queryable delay, from the re-sweep).
 - `<cell>/serial.log` — the raw capture.
 - `<cell>/result.json` — per-window detail (delivered/correct, `discovery_latency_s`,
   `observed_at`, `report_count`, `first_seen` / `last_seen` / `observation_span_s`)
@@ -213,8 +228,9 @@ Under `scripts/results/<timestamp>/`:
   location body is decrypted, not just the envelope timestamp. Without `poll`,
   `report_count` is capped at the ~8-report tail — treat it as a floor.
 - `<cell>/timeseries.csv` — every retained observation flattened to one row
-  (`mid`, `payload`, `timestamp`, `latitude`, `longitude`, `horizontal_accuracy`,
-  `confidence`, `status`, `id`), ready to plot. Most useful with polling on.
+  (`mid`, `payload`, `timestamp`, `propagation_latency_s`, `latitude`, `longitude`,
+  `horizontal_accuracy`, `confidence`, `status`, `id`), ready to plot. Most useful
+  with polling on.
 - `<cell>/uid.hex` — the cell's UID, for re-fetching it later.
 - `density.csv` / `density.log` — the background density time-series (one row per
   snapshot: `timestamp`, `apple_total`, `finders`, `beacons`) and the scanner's
@@ -260,10 +276,14 @@ advertise, so update intervals much shorter than ~60 s will show poor
 deliverability by construction — that ceiling is the thing these experiments
 measure, not a firmware limitation.
 
-Two latencies exist; `espbench` measures the first: **discovery** (tx →
-observed), which comes free from report timestamps and is what differs between
-environments. **Propagation** (observed → queryable on the server) would need
-polling and is mostly environment-independent, so it is not measured.
+Two latencies exist and `espbench` now measures both. **Discovery** (tx →
+observed) comes free from report timestamps and tracks crowd density.
+**Propagation** (observed → queryable on the server) is the ingestion delay: it
+falls out of the poll/re-sweep machinery as `first_fetched_at` − observation
+timestamp. It is mostly density-independent (Apple's pipeline), so treat it as
+instrumentation — it sizes `settle_seconds` correctly and is *not* a variable in
+the advertising-interval regression. Resolution is bounded by the fetch cadence
+(measured to ±one poll/re-sweep interval, biased slightly high).
 
 Because the discovery latency is derived from the report's own observation time,
 `settle_seconds` only needs to be long enough that *some* report has reached the

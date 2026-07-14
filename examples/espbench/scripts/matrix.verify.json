@@ -1,6 +1,6 @@
 {
   "port": "/dev/cu.usbmodem101",
-  "settle_seconds": 120,
+  "settle_seconds": 180,
   "report_floor_skew_s": 120,
   "mid_start": 0,
   "mid_gap": 100,

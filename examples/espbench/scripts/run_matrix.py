@@ -288,11 +288,23 @@ class ReportStore:
         self._data: dict[tuple[int, int], dict[str, dict]] = {}
 
     def merge(self, mid: int, reports: dict[int, list[dict]]) -> None:
-        """Fold one fetch's {payload: [records]} into the accumulated union."""
+        """Fold one fetch's {payload: [records]} into the accumulated union.
+
+        The first fetch that returns a given report id stamps it with
+        `first_fetched_at` (host wall-clock); later re-fetches of the same id keep
+        that original stamp. That first-seen time, minus the report's own
+        (observation) timestamp, is the server-ingestion / propagation latency.
+        """
+        now = time.time()
         with self._lock:
             for payload, records in reports.items():
                 bucket = self._data.setdefault((mid, payload), {})
                 for rec in records:
+                    prev = bucket.get(rec["id"])
+                    if prev is not None and "first_fetched_at" in prev:
+                        rec["first_fetched_at"] = prev["first_fetched_at"]
+                    else:
+                        rec.setdefault("first_fetched_at", now)
                     bucket[rec["id"]] = rec  # de-dup: same observation overwrites
 
     def window(self, mid: int) -> dict[int, list[dict]]:
@@ -352,13 +364,14 @@ class Poller(threading.Thread):
 
 def evaluate(cell: dict, observed: list[dict], account, uid: bytes, *,
              skew_s: float,
-             store: ReportStore | None = None) -> dict:
+             store: ReportStore | None = None, verbose: bool = True) -> dict:
     """Compute the cell's statistics, incl. discovery latency and report volume.
 
     When `store` is given (poll mode), each window's reports come from the
     accumulated union built during the run, so counts are the true observation
     totals rather than a single fetch's ~8-report tail. Otherwise every mid is
-    fetched once here (the classic single-shot path).
+    fetched once here (the classic single-shot path). `verbose` prints one line
+    per window; the post-run re-sweep re-evaluates quietly.
     """
     exp = cell["expected"]
     # When each window went on air (host wall-clock), keyed by mid. Doubles as the
@@ -368,6 +381,10 @@ def evaluate(cell: dict, observed: list[dict], account, uid: bytes, *,
     delivered = correct = 0
     latencies: list[float] = []
     report_counts: list[int] = []  # reports for the expected payload, per window
+    # Propagation (ingestion) latency: first time we could *fetch* a report minus
+    # the report's own observation timestamp. Server-pipeline delay, distinct from
+    # discovery latency (tx -> observed). Only defined in poll mode.
+    propagations: list[float] = []
 
     for mid, payload_exp in exp:
         floor = send_at.get(mid)
@@ -375,6 +392,13 @@ def evaluate(cell: dict, observed: list[dict], account, uid: bytes, *,
             reports = store.window(mid)
         else:
             reports = bc.fetch_reports_for_mid(account, uid, mid, since_epoch=floor, skew_s=skew_s)
+        for recs in reports.values():
+            for rec in recs:
+                ff = rec.get("first_fetched_at")
+                if ff is not None:
+                    prop = max(0.0, ff - datetime.fromisoformat(rec["timestamp"]).timestamp())
+                    rec["propagation_latency_s"] = prop
+                    propagations.append(prop)
         present = set(reports)
         is_delivered = bool(present)
         is_correct = payload_exp in present
@@ -421,11 +445,12 @@ def evaluate(cell: dict, observed: list[dict], account, uid: bytes, *,
             # (keys stringified for JSON); includes collisions, if any.
             "reports": {str(p): recs for p, recs in sorted(reports.items())},
         })
-        status = "correct" if is_correct else ("delivered" if is_delivered else "LOST")
-        lat_str = f" latency={latency:.1f}s" if latency is not None else ""
-        cnt_str = f" reports={len(exp_reports)}" if exp_reports else ""
-        print(f"    mid={mid} expect=0x{payload_exp:02x} -> {status} "
-              f"present={[f'0x{p:02x}' for p in sorted(present)]}{lat_str}{cnt_str}", flush=True)
+        if verbose:
+            status = "correct" if is_correct else ("delivered" if is_delivered else "LOST")
+            lat_str = f" latency={latency:.1f}s" if latency is not None else ""
+            cnt_str = f" reports={len(exp_reports)}" if exp_reports else ""
+            print(f"    mid={mid} expect=0x{payload_exp:02x} -> {status} "
+                  f"present={[f'0x{p:02x}' for p in sorted(present)]}{lat_str}{cnt_str}", flush=True)
 
     n = len(exp)
     # Send duration: wall time on air, from the first tx to a full update
@@ -479,6 +504,12 @@ def evaluate(cell: dict, observed: list[dict], account, uid: bytes, *,
         "reports_per_delivered_mean": statistics.fmean(seen_counts) if seen_counts else None,
         "reports_per_delivered_median": statistics.median(seen_counts) if seen_counts else None,
         "reports_per_delivered_max": max(seen_counts) if seen_counts else None,
+        # Propagation (observed -> queryable) latency across every retained report.
+        "propagation_n": len(propagations),
+        "propagation_min_s": min(propagations) if propagations else None,
+        "propagation_median_s": statistics.median(propagations) if propagations else None,
+        "propagation_mean_s": statistics.fmean(propagations) if propagations else None,
+        "propagation_max_s": max(propagations) if propagations else None,
         "detail": windows,
     }
 
@@ -513,6 +544,8 @@ def main() -> None:
                              "(fall back to a single fetch per mid)")
     parser.add_argument("--no-density", action="store_true",
                         help="skip the background Apple-device density logger")
+    parser.add_argument("--no-resweep", action="store_true",
+                        help="skip the post-run re-sweep for late/propagating reports")
     parser.add_argument("--dry-run", action="store_true",
                         help="print the resolved cells and mid allocation, then exit")
     args = parser.parse_args()
@@ -565,6 +598,10 @@ def main() -> None:
         density_proc = subprocess.Popen(dcmd, stdout=density_log,
                                         stderr=subprocess.STDOUT)
         print(f"density -> {results_dir / 'density.csv'} (every {d_interval}s)")
+
+    # Per-cell state kept for the post-run re-sweep (poll mode only): the report
+    # store to fold late reports into, plus what evaluate needs to recompute.
+    resweep_ctx: list[dict] = []
 
     def process_cell(cell: dict) -> dict | None:
         """Flash, capture, settle, and evaluate one cell.
@@ -667,6 +704,9 @@ def main() -> None:
         print(f"  => deliverability {result['deliverability']:.1%}, "
               f"correctness {result['correctness']:.1%}, "
               f"{result['throughput_bps_delivered']:.4f} B/s delivered, {lat}{rpd}", flush=True)
+        if store is not None:
+            resweep_ctx.append({"cell": cell, "uid": uid, "observed": observed,
+                                "store": store, "cell_dir": cell_dir})
         return result
 
     summary: list[dict] = []
@@ -708,6 +748,50 @@ def main() -> None:
                 continue
             if result is not None:
                 summary.append(result)
+
+        # Post-run re-sweep: ingestion lag can exceed a cell's settle window, so a
+        # report that a finder relayed shows up as LOST at capture time and only
+        # becomes queryable minutes later (exactly what the smoke test hit). Re-fetch
+        # every polled cell's mids at geometric delays, folding late reports into
+        # each store; `first_fetched_at` then gives their propagation latency. Retired
+        # keys are off-air by now, so these sweeps are clean (no 8-cap tail-shift).
+        resweep = matrix.get("resweep_minutes", [1, 3, 6, 10])
+        if resweep_ctx and resweep and not args.no_resweep:
+            print(f"\n=== post-run re-sweep at {resweep} min "
+                  f"({len(resweep_ctx)} cells) ===", flush=True)
+            prev = 0.0
+            for i, mark in enumerate(resweep, 1):
+                wait = max(0.0, (float(mark) - prev) * 60.0)
+                prev = float(mark)
+                print(f"  re-sweep {i}/{len(resweep)}: waiting {wait:.0f}s ...", flush=True)
+                time.sleep(wait)
+                new_ids = 0
+                for ctx in resweep_ctx:
+                    send_at = {o["mid"]: o["host_time"] for o in ctx["observed"]}
+                    before = ctx["store"].total()
+                    for mid, _ in ctx["cell"]["expected"]:
+                        try:
+                            reports = bc.fetch_reports_for_mid(
+                                account, ctx["uid"], mid,
+                                since_epoch=send_at.get(mid), skew_s=skew_s)
+                            ctx["store"].merge(mid, reports)
+                        except Exception as exc:  # noqa: BLE001
+                            print(f"    re-sweep: {ctx['cell']['name']} mid={mid} "
+                                  f"failed: {exc!r}", file=sys.stderr, flush=True)
+                    new_ids += ctx["store"].total() - before
+                print(f"    +{new_ids} new report(s) this sweep", flush=True)
+            # Re-evaluate every re-swept cell with the enriched store and rewrite.
+            idx_by_name = {r["name"]: i for i, r in enumerate(summary)}
+            for ctx in resweep_ctx:
+                result = evaluate(ctx["cell"], ctx["observed"], account, ctx["uid"],
+                                  skew_s=skew_s, store=ctx["store"], verbose=False)
+                result["uid"] = ctx["uid"].hex()
+                (ctx["cell_dir"] / "result.json").write_text(json.dumps(result, indent=2) + "\n")
+                write_timeseries(ctx["cell_dir"] / "timeseries.csv", result)
+                if result["name"] in idx_by_name:
+                    summary[idx_by_name[result["name"]]] = result
+            print("  re-sweep complete; deliverability + propagation updated",
+                  flush=True)
     finally:
         if density_proc is not None:
             density_proc.terminate()
@@ -736,7 +820,9 @@ def write_summary(results_dir: Path, summary: list[dict]) -> None:
             "throughput_bps_offered", "throughput_bps_delivered",
             "latency_n", "latency_min_s", "latency_median_s", "latency_mean_s",
             "latency_max_s", "polled", "reports_total", "reports_per_delivered_mean",
-            "reports_per_delivered_median", "reports_per_delivered_max"]
+            "reports_per_delivered_median", "reports_per_delivered_max",
+            "propagation_n", "propagation_min_s", "propagation_median_s",
+            "propagation_mean_s", "propagation_max_s"]
     with (results_dir / "summary.csv").open("w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=cols)
         writer.writeheader()
@@ -752,8 +838,8 @@ def write_timeseries(path: Path, result: dict) -> None:
     meaningful (most valuable for the static soak). Encrypted-only reports still
     contribute their timestamp; location columns are blank for those.
     """
-    cols = ["mid", "payload", "timestamp", "latitude", "longitude",
-            "horizontal_accuracy", "confidence", "status", "id"]
+    cols = ["mid", "payload", "timestamp", "propagation_latency_s", "latitude",
+            "longitude", "horizontal_accuracy", "confidence", "status", "id"]
     with path.open("w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=cols, extrasaction="ignore")
         writer.writeheader()
