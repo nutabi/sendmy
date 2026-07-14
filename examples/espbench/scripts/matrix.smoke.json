@@ -4,12 +4,19 @@
   "report_floor_skew_s": 120,
   "mid_start": 0,
   "mid_gap": 100,
-  "poll": true,
-  "poll_interval_s": 30,
-  "density": true,
-  "density_interval_s": 30,
-  "density_window_s": 10,
-  "_note": "Smoke test of the updated harness (density logging, env removed, build-output suppressed) on real hardware. ~15 min. Confirm density.csv fills, poll works, console is clean.",
+  "detection": {
+    "poll": true,
+    "poll_interval_s": 30,
+    "detections_before_remove": 2,
+    "lost_timeout_s": 300,
+    "queue_soft_cap": 8
+  },
+  "density": {
+    "enabled": true,
+    "interval_s": 30,
+    "window_s": 10
+  },
+  "_note": "Smoke test of the 3-time-series harness. ~15 min. Confirm transmission.csv + detection.csv fill during the run, the single continuous poller keeps fetching earlier cells while later ones flash, density.csv fills, and analyze.py writes summary.csv at the end. Re-derive offline with: analyze.py results/<run> --deliver-window-s 300",
   "cells": [
     {
       "name": "r0_adv1000",
