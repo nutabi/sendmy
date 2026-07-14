@@ -1,7 +1,6 @@
 version: "1.0.0"
 description: Carrier layer of sendmy protocol
 tags:
-  - findmy
   - offline-finding
   - hkdf
   - esp32

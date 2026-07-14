@@ -1,7 +1,8 @@
 # Project `sendmy`
 
-`sendmy` is one-way communication protocol that utilises Apple's Find My network
-to send data from devices with only Bluetooth Low Energy (BLE) capability.
+`sendmy` is one-way communication protocol that utilises a crowd-sourced BLE
+location-relay network to send data from devices with only Bluetooth Low Energy
+(BLE) capability.
 
 ## Disclaimer
 
@@ -17,8 +18,8 @@ described below.
 
 With respect to the 5-layer TCP/IP model, the aptly named `sendmy_link` roughly
 resembles the link layer, whereas, for the lack of better names, `sendmy_carrier`
-does the job of both application and transport layers. In this sense, Apple's
-Find My network acts as the network layer.
+does the job of both application and transport layers. In this sense, the
+crowd-sourced relay network acts as the network layer.
 
 ### The Link Layer - `sendmy_link`
 
@@ -46,8 +47,8 @@ specific details, as well as instructions on how to use the component.
 This repository also contains two examples: `esptag` and `espsend` to
 demonstrate the PoC implementation.
 
-- `esptag` is simply an AirTag clone, though it's not possible to pair it with
-the Find My app; however, it still broadcasts valid OF advertisements and using
+- `esptag` is simply a commercial-tag clone, though it's not possible to pair it
+with any companion locator app; however, it still broadcasts valid OF advertisements and using
 the same key, anyone could fetch and decrypt location reports of the `esptag`.
 
 - Unlike `esptag`, `espsend` does not allow decryption of location reports;

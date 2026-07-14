@@ -57,7 +57,7 @@ config ESPTAG_ROTATE_INTERVAL_MS
     help
         How often the tag advances an epoch: ratchets the symmetric key, derives
         a fresh advertising identifier, and re-advertises under it. The default
-        of 900000 ms (15 min) matches the Find My cadence; lower it to a few
+        of 900000 ms (15 min) matches the reference locator cadence; lower it to a few
         seconds to watch rotation happen while testing.
 
 config ESPTAG_ADV_INTERVAL_MS

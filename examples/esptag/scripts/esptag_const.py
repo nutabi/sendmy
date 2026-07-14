@@ -6,7 +6,7 @@ silently yields keys that do not match the device, with no error -- so they live
 in one place rather than being copy-pasted into each script.
 
 This module is stdlib-only and importable both before and after the venv
-re-exec the findmy-based scripts perform (it sits next to them in scripts/, which
+re-exec the scan/report scripts perform (it sits next to them in scripts/, which
 is on sys.path[0] whenever a script there is run directly).
 """
 

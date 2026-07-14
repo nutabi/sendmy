@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Scan for nearby Apple "offline finding" (Find My-style) BLE advertisements.
+"""Scan for nearby offline-finding (OF) BLE advertisements.
 
 This is the receiver-side counterpart to the esptag firmware: the tag broadcasts
-a rotating P-224 advertising key (`p_curr`) framed as an Apple offline-finding
+a rotating P-224 advertising key (`p_curr`) framed as an offline-finding
 manufacturer payload (`1e ff 4c 00 ...`, see main/ble_adv.c). FindMy.py's BLE
 scanner parses that frame and, because the firmware sets the OF length byte to 25
 (a "separated" advertisement), reconstructs the full 28-byte advertising public
@@ -56,7 +56,7 @@ def _full_key_hex(device) -> str | None:
     """28-byte advertising key (our p_curr) as hex, or None for non-separated frames.
 
     Only SeparatedOfflineFindingDevice carries the full key; Nearby advertisements
-    (other Apple kit in range) expose only a partial key, which we skip.
+    (other locator kit in range) expose only a partial key, which we skip.
     """
     if isinstance(device, SeparatedOfflineFindingDevice):
         return device.adv_key_bytes.hex()
@@ -142,10 +142,10 @@ def main() -> None:
     parser.add_argument("-v", "--verbose", action="store_true",
                         help="show findmy's own log output, including the benign "
                              "'Invalid OF data length' warnings from neighboring "
-                             "Apple devices (suppressed by default)")
+                             "locator devices (suppressed by default)")
     args = parser.parse_args()
 
-    # findmy logs an error for every neighboring Apple device whose 'Nearby'
+    # findmy logs an error for every neighboring locator device whose 'Nearby'
     # advertisement carries a non-2-byte payload. That noise is unrelated to our
     # tag (which advertises a 25-byte 'Separated' frame), so quiet it by default.
     if not args.verbose:

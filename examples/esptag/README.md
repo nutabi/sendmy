@@ -1,14 +1,14 @@
 # `esptag`
 
-`esptag` is a self-contained Find My tag, an AirTag clone in everything but the
-pairing. It broadcasts valid Offline Finding advertisements through
+`esptag` is a self-contained locator tag, a commercial-tag clone in everything but
+the pairing. It broadcasts valid Offline Finding advertisements through
 `sendmy_link` and runs its own P-224 key ratchet on top, mirroring the algorithm
-Apple specifies for Find My accessories. It does not use `sendmy_carrier`; it is
+the reference locator accessories use. It does not use `sendmy_carrier`; it is
 a tag, not a data channel.
 
-You cannot pair it with the Find My app, but it still emits real OF beacons, and
+You cannot pair it with any companion locator app, but it still emits real OF beacons, and
 anyone holding the provisioned root secrets can reconstruct the per-epoch
-private keys and decrypt the location reports Apple's network collected.
+private keys and decrypt the location reports the relay network collected.
 
 ## How the key ratchet works
 
@@ -33,7 +33,7 @@ Every *epoch* it advances one step:
    secp224r1 public key with its header byte stripped, leaving 28 bytes.
 
 `p_i` goes to `sm_ll_set_key`, which rotates the BLE identity. The `KDF` is ANSI
-X9.63, the same one AirTags use. The scalar arithmetic runs on mbedTLS's
+X9.63, the same one commercial locator tags use. The scalar arithmetic runs on mbedTLS's
 `mbedtls_mpi`; the point multiplication `d_i * G` uses the vendored `micro_ecc`
 configured for secp224r1.
 
@@ -85,7 +85,7 @@ partially-written counter, and the counter write path never touches the seed.
 ## Rotation and persistence
 
 Rotation is driven by a NimBLE callout on the host task, every 15 minutes by
-default, matching the Find My cadence. With `CONFIG_ESPTAG_PERSIST_COUNTER` on
+default, matching the reference locator cadence. With `CONFIG_ESPTAG_PERSIST_COUNTER` on
 (the default) the counter is written to NVS after each rotation; on the next
 boot the tag fast-forwards the ratchet from `sk_0` by that many steps and
 resumes where it left off instead of replaying from epoch 0. If a counter write
@@ -122,10 +122,10 @@ scripts/.venv/bin/python scripts/scan_findmy.py -d 0        # continuous
 scripts/.venv/bin/python scripts/scan_findmy.py --rssi -70  # wider range
 ```
 
-`scripts/fetch_reports.py` pulls location reports from Apple for a range of
+`scripts/fetch_reports.py` pulls location reports from the relay for a range of
 epochs. For each epoch it derives the private scalar with the same
 `d_i = (d_0 * u + v) mod n` the firmware uses, wraps it in a key pair, and
-queries Apple in one batched request. Reports print oldest-first with epoch
+queries the relay in one batched request. Reports print oldest-first with epoch
 index, timestamp, lat/lon, and accuracy.
 
 ```sh

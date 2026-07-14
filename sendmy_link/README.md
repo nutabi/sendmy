@@ -8,12 +8,12 @@ non-discoverable broadcaster.
 
 ## The advertisement
 
-Apple's OF format is a BLE manufacturer-specific record (AD type `0xFF`, company
-`0x004C`). `sendmy_link` lays the 28-byte key across the random address and the
+The OF advertising format is a BLE manufacturer-specific record (AD type `0xFF`,
+company `0x004C`). `sendmy_link` lays the 28-byte key across the random address and the
 manufacturer payload exactly as a real tag does:
 
 ```
-1e ff 4c 00   AD header + Apple company ID
+1e ff 4c 00   AD header + company ID
 12            OF type (offline finding)
 19            payload length = 25
 00            status byte

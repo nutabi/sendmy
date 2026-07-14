@@ -86,7 +86,7 @@ def load_account() -> AppleAccount:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Recover one espsend payload octet for a message_id.",
+        description="Recover one espsend payload octet (temperature) for a message_id.",
     )
     parser.add_argument(
         "message_id", nargs="?", type=int, default=0,
@@ -117,10 +117,12 @@ def main() -> None:
               f"({hexes}); reporting first", file=sys.stderr)
 
     payload = present[0]
-    glyph = chr(payload) if 0x20 <= payload < 0x7F else "."
-    print(f"mid={args.message_id} payload=0x{payload:02x} ({payload}) '{glyph}'",
+    # The firmware encodes the temperature as a two's-complement signed byte of
+    # degrees Celsius, so reinterpret the recovered octet as an int8.
+    temp_c = payload - 256 if payload >= 0x80 else payload
+    print(f"mid={args.message_id} payload=0x{payload:02x} ({payload}) temp={temp_c} C",
           file=sys.stderr)
-    print(f"{payload:02x}")  # stdout: the octet, for piping/concatenation
+    print(f"{payload:02x}")  # stdout: the raw octet, for piping/concatenation
 
 
 if __name__ == "__main__":

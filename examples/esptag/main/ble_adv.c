@@ -12,7 +12,7 @@
 
 // Epoch length: how often the tag rotates and the advertised identifier
 // changes. Configured via CONFIG_ESPTAG_ROTATE_INTERVAL_MS (esptag
-// configuration menu, default 15 min to match the Find My cadence); drop it to
+// configuration menu, default 15 min to match the reference locator cadence); drop it to
 // a few seconds to observe rotation while testing.
 #define ROTATE_INTERVAL_MS CONFIG_ESPTAG_ROTATE_INTERVAL_MS
 

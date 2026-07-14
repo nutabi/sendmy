@@ -1,4 +1,4 @@
-# sdkconfig.defaults — esptag (Find My-style BLE locator tag)
+# sdkconfig.defaults — esptag (offline-finding BLE locator tag)
 #
 # Regenerate sdkconfig from this file:   rm sdkconfig && idf.py reconfigure
 #
@@ -50,7 +50,7 @@ CONFIG_BT_NIMBLE_LL_CFG_FEAT_LE_ENCRYPTION=n
 CONFIG_BT_NIMBLE_HS_PVCY=n
 CONFIG_BT_NIMBLE_MAX_CONNECTIONS=0
 
-# Legacy advertising only. Apple Find My / OpenHaystack beacons use legacy adv,
+# Legacy advertising only. Offline-finding / OpenHaystack beacons use legacy adv,
 # so the BT 5.0 extended/2M/coded-PHY machinery is dead weight here.
 CONFIG_BT_NIMBLE_50_FEATURE_SUPPORT=n
 CONFIG_BT_NIMBLE_LL_CFG_FEAT_LE_2M_PHY=n

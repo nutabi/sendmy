@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Scan for Find My (offline-finding) BLE advertisements and print the 28-byte
+"""Scan for offline-finding (OF) BLE advertisements and print the 28-byte
 advertising key of every "separated" beacon seen.
 
 This is the receive-side counterpart to the espsend firmware: the firmware
-advertises a 28-byte carrier as a Find My key, and this script recovers that key
+advertises a 28-byte carrier as an OF advertising key, and this script recovers that key
 off the air so it can be matched against the carrier IDs the receiver derives.
 
 A "separated" beacon broadcasts its full public key: 6 bytes ride in the BLE
-static-random address, 22 in the Apple manufacturer payload, and the 2 missing
+static-random address, 22 in the manufacturer payload, and the 2 missing
 MSBs of byte 0 are carried in the payload's key_hi field. FindMy.py's
 OfflineFindingScanner reassembles all 28 bytes into `adv_key_bytes`.
 
@@ -58,7 +58,7 @@ async def scan(timeout: float, *, watch: bool, verbose: bool) -> int:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Scan Find My advertisements and print the 28-byte key(s).",
+        description="Scan offline-finding advertisements and print the 28-byte key(s).",
     )
     parser.add_argument(
         "-t",

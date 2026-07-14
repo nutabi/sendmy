@@ -82,7 +82,7 @@ esp_err_t sm_ll_init(void (*on_ready)(void), uint32_t adv_interval_ms)
     s_on_ready = on_ready;
     s_adv_interval_ms = adv_interval_ms;
 
-    ESP_LOGI(TAG, "initialising Find My advertising (interval %lu ms)", (unsigned long)adv_interval_ms);
+    ESP_LOGI(TAG, "initialising OF advertising (interval %lu ms)", (unsigned long)adv_interval_ms);
 
     esp_err_t err = nimble_port_init();
     if (err != ESP_OK) {
