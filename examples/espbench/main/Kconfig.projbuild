@@ -1,0 +1,113 @@
+menu "espbench configuration"
+
+choice ESPBENCH_MODE
+    prompt "Payload generation mode"
+    default ESPBENCH_MODE_INCREMENTAL
+    help
+        How the single payload octet is produced for each message window.
+
+        These map directly onto the three experiment shapes:
+
+          - Static: one fixed carrier held for the whole run (a single mid,
+            never rotated). Measures whether one unchanging beacon keeps being
+            delivered by the relay over time.
+
+          - Incremental: mid advances every update interval and the payload is
+            (start + i) mod 256. A deterministic, self-checking ramp.
+
+          - Random: mid advances every update interval and the payload is drawn
+            from a seeded on-device PRNG (xorshift32). The host reproduces the
+            exact same sequence from the seed, so correctness is still checkable.
+
+    config ESPBENCH_MODE_STATIC
+        bool "Static (single fixed carrier)"
+    config ESPBENCH_MODE_INCREMENTAL
+        bool "Incremental (payload = start + i)"
+    config ESPBENCH_MODE_RANDOM
+        bool "Random (seeded PRNG)"
+endchoice
+
+config ESPBENCH_MODE
+    int
+    # Values consumed by espbench.c to branch the sender.
+    default 0 if ESPBENCH_MODE_STATIC
+    default 1 if ESPBENCH_MODE_INCREMENTAL
+    default 2 if ESPBENCH_MODE_RANDOM
+
+config ESPBENCH_ADV_INTERVAL_MS
+    int "BLE advertising interval (ms)"
+    default 1000
+    range 20 10240
+    help
+        How often a BLE legacy advertising event fires (passed to sm_ll_init).
+        One event sweeps the three primary channels once, so this is roughly
+        "one broadcast per channel per window". Range matches the BLE legacy
+        non-connectable advertising limits (20 ms .. 10240 ms).
+
+        This is the primary independent variable for throughput/deliverability:
+        a shorter interval means more radiated advertisements per unit time and
+        more chances for a passing relay to observe the carrier.
+
+config ESPBENCH_UPDATE_INTERVAL_MS
+    int "Payload/mid update interval (ms)"
+    depends on !ESPBENCH_MODE_STATIC
+    default 60000
+    range 1000 3600000
+    help
+        Incremental/random only: how long each mid is held before rotating to
+        the next (mid, payload). Should be comfortably larger than the
+        advertising interval so every window radiates many advertisements. The
+        relay network only files a report every minute or so, so windows much
+        shorter than ~60 s will see poor deliverability by construction.
+
+config ESPBENCH_MSG_COUNT
+    int "Number of message windows to send"
+    depends on !ESPBENCH_MODE_STATIC
+    default 16
+    range 1 100000
+    help
+        Incremental/random only: how many mids to broadcast, one per update
+        interval, before the run finishes. Total run time is roughly
+        MSG_COUNT * UPDATE_INTERVAL_MS.
+
+config ESPBENCH_STATIC_DURATION_MS
+    int "Static broadcast duration (ms)"
+    depends on ESPBENCH_MODE_STATIC
+    default 600000
+    range 0 86400000
+    help
+        Static only: how long to hold the single carrier before the run reports
+        itself finished. 0 means broadcast forever (the run never emits its done
+        marker; useful for open-ended soak tests driven by hand).
+
+config ESPBENCH_MID_BASE
+    int "Starting message-id"
+    default 0
+    range 0 2000000000
+    help
+        The mid of the first (or only, in static mode) window. Every carrier is
+        derived from (uid, mid, payload), so two matrix cells that reuse the same
+        mid range on the same uid would broadcast colliding carriers on the
+        shared relay. The run_matrix.py harness assigns each cell a disjoint mid
+        base automatically; set this by hand only for standalone runs.
+
+config ESPBENCH_PAYLOAD_START
+    int "Starting payload byte"
+    default 0
+    range 0 255
+    help
+        Static: the constant payload octet. Incremental: the first octet, then
+        +1 (mod 256) per window. Ignored in random mode.
+
+config ESPBENCH_RANDOM_SEED
+    hex "PRNG seed (random mode)"
+    depends on ESPBENCH_MODE_RANDOM
+    default 0x1
+    range 0x1 0xFFFFFFFF
+    help
+        32-bit seed for the on-device xorshift32 PRNG used in random mode. The
+        host harness reproduces the identical payload sequence from this value,
+        so correctness stays verifiable. Must be non-zero (xorshift32 is stuck
+        at zero); the range enforces this.
+
+endmenu

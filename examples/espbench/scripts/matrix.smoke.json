@@ -1,0 +1,43 @@
+{
+  "port": "/dev/cu.usbmodem101",
+  "settle_seconds": 90,
+  "report_floor_skew_s": 120,
+  "mid_start": 0,
+  "mid_gap": 100,
+  "poll": true,
+  "poll_interval_s": 30,
+  "density": true,
+  "density_interval_s": 30,
+  "density_window_s": 10,
+  "_note": "Smoke test of the updated harness (density logging, env removed, build-output suppressed) on real hardware. ~15 min. Confirm density.csv fills, poll works, console is clean.",
+  "cells": [
+    {
+      "name": "r0_adv1000",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 60000,
+      "count": 1
+    },
+    {
+      "name": "r0_adv9000",
+      "mode": "incremental",
+      "adv_interval_ms": 9000,
+      "update_interval_ms": 60000,
+      "count": 1
+    },
+    {
+      "name": "r1_adv1000",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 60000,
+      "count": 1
+    },
+    {
+      "name": "r1_adv9000",
+      "mode": "incremental",
+      "adv_interval_ms": 9000,
+      "update_interval_ms": 60000,
+      "count": 1
+    }
+  ]
+}
