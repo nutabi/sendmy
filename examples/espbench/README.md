@@ -103,8 +103,11 @@ idf.py build flash monitor
 `scripts/run_matrix.py` drives the whole experiment loop. **Launch it from an
 ESP-IDF-activated shell** (so `idf.py` is on PATH) with the board attached. For
 each cell it mints a fresh `uid`, writes an sdkconfig fragment, builds and
-flashes, resets the board and captures the serial log, waits a settle period for
-the relay to file reports, fetches every mid, and computes the statistics.
+flashes, resets the board and captures the serial log. It records three
+independent, append-only **time-series** as the run happens — transmission (what
+went on air), detection (what the relay returned), and density (nearby finders) —
+and joins them into the delivery metrics *offline* at the end (see
+[Three time-series + offline analysis](#three-time-series--offline-analysis)).
 
 ```sh
 # one-time host setup
@@ -155,59 +158,96 @@ A JSON object (see `scripts/matrix.example.json`). Top-level keys:
 | Key | Default | Meaning |
 |-----|---------|---------|
 | `port` | — | serial port (or pass `--port`) |
-| `settle_seconds` | 120 | wait after a run before fetching, to let relays report |
+| `settle_seconds` | 120 | max time to keep draining the poll queue after the last cell |
 | `report_floor_skew_s` | 120 | clock-skew slack when rejecting reports older than a window's send time |
 | `mid_start` | 0 | first auto-assigned mid |
 | `mid_gap` | 100 | spare mids left between cells |
-| `poll` | false | fetch reports *during* the run and union them (see below) |
-| `poll_interval_s` | 60 | how often to poll when `poll` is on |
-| `resweep_minutes` | `[1,3,6,10]` | post-run re-fetch delays that catch late/propagating reports (`--no-resweep` to skip; `[]` disables) |
-| `density` | true | log nearby Apple-device density during the run (`--no-density` to skip) |
-| `density_interval_s` | 60 | seconds between density snapshots |
-| `density_window_s` | 10 | scan duration per density snapshot |
-| `density_rssi_min` | — | if set, only count devices at/above this RSSI (e.g. `-70` for near) |
+| `deliver_window_s` | — | offline deliverability window (see below); unset = no upper bound |
+| `detection` | — | detection/poll producer config (block; flat fallbacks below) |
+| `density` | — | density producer config (block or bool toggle; flat fallbacks below) |
 | `build_dir` | `<project>/build` | shared build directory (incremental) |
 | `results_dir` | `scripts/results` | where run artifacts are written |
-| `cells` | — | list of experiment cells |
+| `cells` | — | list of experiment cells (the transmission producer) |
+
+The **`detection`** block (with backward-compatible top-level fallbacks):
+
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `poll` | false | run the continuous detection poller (`--no-poll` disables it) |
+| `poll_interval_s` | 30 | how often the poller fetches every queued key |
+| `detections_before_remove` | 1 | detections to log per key before dropping it from the queue (≤ 0 = unbounded, for a soak) |
+| `lost_timeout_s` | 300 | base patience for an *unseen* key before the poller stops fetching it |
+| `queue_soft_cap` | 8 | queue size under which the full timeout applies; above it the timeout shrinks to bound the fetch rate |
+
+The **`density`** block (or set `density: false` to disable; flat `density_*`
+keys still work):
+
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `enabled` | true | log nearby Apple-device density during the run (`--no-density` to skip) |
+| `interval_s` | 60 | seconds between density snapshots |
+| `window_s` | 10 | scan duration per density snapshot |
+| `rssi_min` | — | if set, only count devices at/above this RSSI (e.g. `-70` for near) |
 
 Each cell: `mode`, `adv_interval_ms`, and then `update_interval_ms` + `count`
 (rotating modes) or `duration_ms` (static); optional `payload_start`, `seed`,
-`name`, `mid_base` (auto-assigned if omitted), and per-cell `poll` /
-`poll_interval_s` overrides.
+`name`, `mid_base` (auto-assigned if omitted).
 
-### Polling (beating the report cap)
+### Three time-series + offline analysis
 
-Apple returns at most **~8 most-recent reports per key** per fetch — a hard
-server-side cap (the request already asks for the full 7-day window). So a single
-post-run fetch only ever sees a key's recent tail: a 3 h static soak surfaces 8
-reports, all from its final seconds, and re-fetching later just shifts the tail
-(inflating apparent latency). With `poll: true`, a background thread fetches the
-currently-advertising mid every `poll_interval_s` throughout the run and unions
-the results by report id, so `report_count` becomes the true observation total
-and the static soak yields its real multi-hour time-series. Only the poller talks
-to the relay during a cell (serial capture does no network I/O), so there is no
-concurrent account access. `--no-poll` forces the classic single-fetch path.
+The harness never decides delivery *while it runs*; it records three faithful,
+append-only series and joins them afterwards. This is what makes propagation
+latency correct — an early cell's keys keep being polled while later cells run, so
+a report is first-seen when it truly becomes queryable, not at some end-of-run
+sweep — and it lets every metric be re-derived (with a different deliverability
+window, say) by `analyze.py` alone, without re-running or touching the servers.
 
-For rotating cells each key is on air for one update interval, so keep
-`poll_interval_s` below half of it; static cells hold one key for the whole run,
-so any interval accumulates (a coarse interval like 300 s is plenty).
+1. **Transmission** (`transmission.csv`) — one row per key put on air
+   (`cell, uid, mid, payload, send_time`), straight off the serial `tx` line.
+2. **Detection** (`detection.csv`) — one row per (key, report) the poller ever
+   sees (`cell, uid, mid, payload, report_id, obs_timestamp, first_fetched_at`,
+   decrypted `latitude/longitude/horizontal_accuracy/confidence/status`), deduped
+   by report id. `first_fetched_at` is the wall-clock of the *first* fetch that
+   returned that id — that minus its observation timestamp is the propagation
+   latency.
+3. **Density** (`density.csv`) — the nearby-finder time-series (see below).
 
-### Post-run re-sweep (late reports + propagation latency)
+**The detection poller.** A single background poller runs for the whole run. Each
+key is enqueued the instant it starts transmitting (`on_tx`), carrying its own
+`uid`, and the poller fetches every queued key each `poll_interval_s`, appending
+new reports to the detection series. A key leaves the queue once it has logged
+`detections_before_remove` detections, or — while still unseen — once it outlives
+the `lost_timeout_s` patience. That timeout is **adaptive**: it holds full value
+while the queue fits `queue_soft_cap` and shrinks as the backlog grows, so the
+fetch rate on the single account stays bounded under low density. Crucially these
+are *polling-efficiency* knobs, **not** deliverability verdicts — deliverability
+is decided offline with whatever window you choose, so an aggressive timeout can
+never false-LOST a real-but-slow delivery; it only means fewer detection rows.
+Only the poller talks to the relay (serial capture does no network I/O), so there
+is never concurrent account access. `--no-poll` swaps the continuous poller for a
+single post-run sweep per key (deliverability is still complete; propagation is
+not meaningful).
 
-A report's server **ingestion lag can exceed a cell's `settle_seconds`**: a finder
-relays the beacon, but the report only becomes queryable minutes later — so it
-reads as LOST at capture time. After all cells finish, the harness re-fetches every
-polled cell's mids at the `resweep_minutes` delays and folds late reports into each
-store, then re-evaluates, so `deliverability` reflects the full picture. The first
-fetch that returns a report id stamps it (`first_fetched_at`); that minus the
-report's own observation timestamp is the **propagation latency** (see below).
-Poll cadence stays coarse (~30 s, under the ~60 s relay cadence) to avoid
-rate-limiting; the re-sweep is where the long tail is captured cheaply.
+Apple caps a single fetch at **~8 most-recent reports per key**, so a soak's true
+multi-hour history is only obtainable by polling over time and unioning by id.
+Set `detections_before_remove: 0` (unbounded) with a large `lost_timeout_s` to
+keep a static key in the queue for the whole soak.
+
+**Offline analysis.** At the end of a run — and re-runnable any time with
+`analyze.py results/<timestamp> [--deliver-window-s N]` — the three series are
+joined into `summary.csv` / `summary.json` and each `<cell>/result.json` +
+`<cell>/timeseries.csv`. Those are *derived artifacts*; the CSV series are the
+ground truth. `deliver_window_s` is the query-time deliverability definition: a
+window counts as delivered only if its expected payload was observed within that
+many seconds of its send time (unset = ever observed).
 
 ### Output
 
 Under `scripts/results/<timestamp>/`:
 
+- `transmission.csv` / `detection.csv` — the two secret series (they carry `uid`
+  and decrypted GPS), gitignored. `cells.json` — the run config plus each cell's
+  config-derived expected sequence, which `analyze.py` joins against.
 - `summary.csv` / `summary.json` — one row per cell with
   `deliverability`, `correctness`, `bytes_sent`, `bytes_delivered`,
   `send_seconds`, offered and delivered throughput in bytes/second, the
@@ -216,7 +256,7 @@ Under `scripts/results/<timestamp>/`:
   totals or a capped tail), the report-volume aggregates (`reports_total`,
   `reports_per_delivered_mean` / `_median` / `_max`), and the propagation-latency
   aggregates (`propagation_n`, `propagation_min_s` / `_median_s` / `_mean_s` /
-  `_max_s` — observed → queryable delay, from the re-sweep).
+  `_max_s` — observed → queryable delay, from the detection series).
 - `<cell>/serial.log` — the raw capture.
 - `<cell>/result.json` — per-window detail (delivered/correct, `discovery_latency_s`,
   `observed_at`, `report_count`, `first_seen` / `last_seen` / `observation_span_s`)
@@ -237,8 +277,10 @@ Under `scripts/results/<timestamp>/`:
   own log. Join `finders` to each window by nearest timestamp.
 
 Useful flags: `--no-flash` (capture a run already on the board), `--no-fetch`
-(capture only, skip the relay stage), `--no-poll` (single fetch even if the
-matrix enables polling), `--dry-run`.
+(capture only, skip the detection/analysis stage), `--no-poll` (single post-run
+sweep instead of the continuous poller), `--deliver-window-s N` (deliverability
+window for the offline analysis), `--dry-run`. Re-derive the metrics from an
+existing run's series with `analyze.py results/<timestamp> [--deliver-window-s N]`.
 
 ### Resilience (unattended runs)
 
@@ -253,7 +295,10 @@ which cells came through the retry pass.
 
 For a cell of `N` windows (1 octet each):
 
-- **deliverability** = windows with any relay report / `N`.
+- **deliverability** = windows with a relay report within `deliver_window_s` of
+  their send time / `N` (unset window = ever observed). Because this is a
+  query-time definition over the detection series, it can be re-derived with a
+  different window by re-running `analyze.py` — no re-run of the experiment.
 - **correctness** = windows whose recovered byte equals the expected byte / `N`.
 - **offered throughput** = `N` bytes / send-duration.
 - **delivered throughput** = delivered bytes / send-duration.
@@ -279,17 +324,20 @@ measure, not a firmware limitation.
 Two latencies exist and `espbench` now measures both. **Discovery** (tx →
 observed) comes free from report timestamps and tracks crowd density.
 **Propagation** (observed → queryable on the server) is the ingestion delay: it
-falls out of the poll/re-sweep machinery as `first_fetched_at` − observation
-timestamp. It is mostly density-independent (Apple's pipeline), so treat it as
-instrumentation — it sizes `settle_seconds` correctly and is *not* a variable in
-the advertising-interval regression. Resolution is bounded by the fetch cadence
-(measured to ±one poll/re-sweep interval, biased slightly high).
+is the detection series' `first_fetched_at` − observation timestamp. Because the
+poller keeps fetching each key (enqueued at its send time) long after its window
+ends, that first-seen stamp is when the report *truly* became queryable — not
+when some later sweep happened to look. It is mostly density-independent (Apple's
+pipeline), so treat it as instrumentation and *not* a variable in the
+advertising-interval regression. Resolution is bounded by the poll cadence
+(measured to ±one `poll_interval_s`, biased slightly high).
 
 Because the discovery latency is derived from the report's own observation time,
-`settle_seconds` only needs to be long enough that *some* report has reached the
-server before you fetch — it does not bias the latency value. Reports keep
-arriving for minutes and the relay retains them for seven days, so under-settled
-cells can always be re-fetched later.
+`settle_seconds` (the post-run queue-drain cap) only needs to be long enough that
+*some* report has reached the server before the poller stops — it does not bias
+the latency value. Reports keep arriving for minutes and the relay retains them
+for seven days, so under-settled cells can always be re-fetched later with
+`fetch_reports.py` or a fresh `analyze.py`.
 
 ## Manual receiver
 
