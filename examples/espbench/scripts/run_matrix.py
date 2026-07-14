@@ -267,6 +267,33 @@ def build_and_flash(project_dir: Path, build_dir: Path, fragment: Path,
         "build", "flash",
     ]
     print(f"  building & flashing ({fragment.name}) ...", flush=True)
+    _run_build(cmd)
+
+
+def park_board(port: str, esptool: str = "esptool.py") -> None:
+    """Leave the board halted in the ROM bootloader so it stops advertising.
+
+    espbench is a one-way beacon with no serial command channel, and after a
+    cell's `done` marker the firmware keeps advertising its last carrier until
+    reset. To stop the radio without a firmware change we reset the chip *into*
+    the ROM serial bootloader (`--before default_reset`) and then decline the
+    final reset (`--after no_reset`): the application never starts, so NimBLE
+    never comes up and nothing is advertised until the next reset/power-cycle.
+    `chip_id` is just a trivial op to hang the reset behaviour on. Best-effort:
+    a failure here only means the board keeps beaconing, so we warn, not abort.
+    """
+    cmd = [esptool, "--port", port, "--before", "default_reset",
+           "--after", "no_reset", "chip_id"]
+    print("parking board in bootloader (stops advertising) ...", flush=True)
+    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                          text=True)
+    if proc.returncode != 0:
+        sys.stderr.write(proc.stdout)
+        print("warning: could not park the board; it may keep advertising. "
+              "Unplug it or hold BOOT + tap RESET to stop.", file=sys.stderr)
+
+
+def _run_build(cmd: list[str]) -> None:
     # Capture the idf.py build/flash output and surface it only on failure, so
     # normal runs show test output + errors without the ninja build spam.
     proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -605,6 +632,9 @@ def main() -> None:
                              "(default: matrix value, else no upper bound)")
     parser.add_argument("--dry-run", action="store_true",
                         help="print the resolved cells and mid allocation, then exit")
+    parser.add_argument("--no-park", action="store_true",
+                        help="do not leave the board halted in the bootloader at "
+                             "the end (it will keep advertising its last carrier)")
     args = parser.parse_args()
 
     matrix = json.loads(args.matrix.read_text())
@@ -826,6 +856,10 @@ def main() -> None:
                   flush=True)
         if summary:
             print(f"\nsummary -> {results_dir / 'summary.csv'}")
+
+    # Halt the board so it stops beaconing its last carrier (see park_board).
+    if not args.no_park and matrix.get("park_on_finish", True):
+        park_board(port, matrix.get("esptool", "esptool.py"))
 
 
 def _group_uids(tx_records: list[dict]) -> dict[str, list[dict]]:

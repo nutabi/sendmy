@@ -1,0 +1,167 @@
+{
+  "settle_seconds": 120,
+  "report_floor_skew_s": 120,
+  "mid_gap": 100,
+  "deliver_window_s": null,
+  "detection": {
+    "poll": true,
+    "poll_interval_s": 30,
+    "detections_before_remove": 1,
+    "lost_timeout_s": 300,
+    "queue_soft_cap": 8
+  },
+  "density": {
+    "enabled": true,
+    "interval_s": 60,
+    "window_s": 10
+  },
+  "cells": [
+    {
+      "name": "s00_u010",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 10000,
+      "count": 12
+    },
+    {
+      "name": "s01_u020",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 20000,
+      "count": 12
+    },
+    {
+      "name": "s02_u030",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 30000,
+      "count": 12
+    },
+    {
+      "name": "s03_u040",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 40000,
+      "count": 12
+    },
+    {
+      "name": "s04_u050",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 50000,
+      "count": 12
+    },
+    {
+      "name": "s05_u060",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 60000,
+      "count": 12
+    },
+    {
+      "name": "s06_u070",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 70000,
+      "count": 12
+    },
+    {
+      "name": "s07_u030",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 30000,
+      "count": 12
+    },
+    {
+      "name": "s08_u040",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 40000,
+      "count": 12
+    },
+    {
+      "name": "s09_u050",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 50000,
+      "count": 12
+    },
+    {
+      "name": "s10_u060",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 60000,
+      "count": 12
+    },
+    {
+      "name": "s11_u070",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 70000,
+      "count": 12
+    },
+    {
+      "name": "s12_u010",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 10000,
+      "count": 12
+    },
+    {
+      "name": "s13_u020",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 20000,
+      "count": 12
+    },
+    {
+      "name": "s14_u050",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 50000,
+      "count": 12
+    },
+    {
+      "name": "s15_u060",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 60000,
+      "count": 12
+    },
+    {
+      "name": "s16_u070",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 70000,
+      "count": 12
+    },
+    {
+      "name": "s17_u010",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 10000,
+      "count": 12
+    },
+    {
+      "name": "s18_u020",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 20000,
+      "count": 12
+    },
+    {
+      "name": "s19_u030",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 30000,
+      "count": 12
+    },
+    {
+      "name": "s20_u040",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 40000,
+      "count": 12
+    }
+  ]
+}
