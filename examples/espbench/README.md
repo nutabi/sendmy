@@ -247,6 +247,15 @@ is never concurrent account access. `--no-poll` swaps the continuous poller for 
 single post-run sweep per key (deliverability is still complete; propagation is
 not meaningful).
 
+> **Note — the live detection counts are not deliverability.** `queue_soft_cap`
+> and the adaptive `lost_timeout_s` together drop still-unseen keys once the
+> queue is busy, so a report that becomes queryable after the (shrunken) timeout
+> is never fetched and the key looks lost when it was merely slow. This makes the
+> *live* detection statistics under-report — badly, under backlog — and even
+> introduces a spurious trend (denser cells suffer the largest queue and the
+> worst under-count). Always take deliverability from the offline analysis, not
+> the live counts (see [Experimental results](#experimental-results)).
+
 Apple caps a single fetch at **~8 most-recent reports per key**, so a soak's true
 multi-hour history is only obtainable by polling over time and unioning by id.
 Set `detections_before_remove: 0` (unbounded) with a large `lost_timeout_s` to
@@ -359,6 +368,54 @@ poller stops — it does not bias the latency value. The drain lasts at least
 than being cut off by a short `settle_seconds`. Reports keep arriving for minutes and the relay retains them
 for seven days, so under-settled cells can always be re-fetched later with
 `fetch_reports.py` or a fresh `analyze.py`.
+
+## Experimental results
+
+Concrete findings from runs of the harness. Each subsection records the matrix
+parameters, what the run was meant to answer, the summary statistics, and the
+conclusion.
+
+### Update-interval throughput sweep — the live poller under-reports deliverability
+
+**Parameters.** 120 `incremental` cells, 1 s advertising interval, 20 windows
+each, over four update intervals — **u06/u10/u14/u18** = 6/10/14/18 s per key, 30
+cells apiece. Detection poller: fetch every 30 s, drop a key after its first
+detection, base patience 480 s for an unseen key, soft-cap the queue at 12 keys,
+120 s clock-skew slack when rejecting stale reports.
+
+**Goal.** Measure how deliverability varies with the update interval — i.e. does
+holding each `mid` on air longer improve the fraction that comes back?
+
+**Statistics.** Across the 790 keys the live poller *did* catch, the propagation
+delay (send → first queryable) was min 10 s, **median 129 s, p90 256 s**, max
+374 s. The density logger showed **finders present the whole run** (3–9 during
+every window, including the ones that came back empty). The live poller logged 0
+detections for **18 of the 120 cells**; a clean offline resweep (256-carrier
+brute per mid, `since_epoch` = send time, 120 s skew — no queue pressure)
+recovered **2388 of 2400 keys**, and every one of those 18 cells came back
+~20/20.
+
+| interval | cells | live avg /20 | **true avg /20** | live % | **true %** |
+|----------|-------|--------------|------------------|--------|------------|
+| u06 (6 s)  | 30 | 6.9 | 19.6 | 34.7% | **98.2%** |
+| u10 (10 s) | 30 | 7.4 | 20.0 | 37.2% | **99.8%** |
+| u14 (14 s) | 30 | 8.7 | 20.0 | 43.3% | **100%** |
+| u18 (18 s) | 30 | 9.0 | 20.0 | 44.8% | **100%** |
+| **all**    | 120 | 8.0 | 19.9 | **40.0%** | **99.5%** |
+
+**Result.** True deliverability is ~99.5% and **flat across every update
+interval** — at these settings the send path and the finder network deliver
+essentially everything, with no interval knee. The live poller's counts (40%)
+were a sampling artifact of the adaptive timeout: an unseen key is dropped once
+`now − send_time > lost_timeout_s · queue_soft_cap / queue_size`, so under
+backlog the effective timeout (queue 40 → 144 s, 60 → 96 s) falls below the real
+p90 propagation of 256 s and slow-but-real keys get abandoned before their
+reports become queryable. The apparent "longer dwell delivers better" trend
+(u06 34.7% → u18 44.8%) is the *inverse* of a delivery effect — it is a
+queue-pressure gradient, since u06 packs the most keys per unit time and so
+suffers the largest backlog and the worst under-count. **Read deliverability from
+an offline sweep (`analyze.py` over the detection series, or a fresh re-fetch),
+never from the live poller's detection counts.**
 
 ## Manual receiver
 
