@@ -10,8 +10,11 @@ experiment matrix, and it ships Python tooling that automates the whole loop.
 
 ## What it does
 
-On boot it loads the 32-byte Unilink ID (`uid`) from NVS, brings up NimBLE, and
-runs one experiment according to its compile-time configuration. Each *window*
+The board is flashed **once** with a generic, reconfigurable firmware. On boot it
+brings up NimBLE, prints a `ready` marker, and then loops reading one-line
+`run key=val ...` commands from the console UART — the host pushes each matrix
+cell's parameters (including a fresh 32-byte Unilink ID, `uid`) over serial and
+the device runs that cell, then waits for the next command. Each *window*
 advertises a single payload octet by deriving a carrier with
 `sm_cr_build_carrier(uid, mid, payload)` and handing it to `sm_ll_set_key`. There
 are three payload modes:
@@ -22,13 +25,13 @@ are three payload modes:
 | `incremental` | `(start + i) mod 256`     | advances every window    | Deterministic self-checking ramp. |
 | `random`      | seeded xorshift32 PRNG    | advances every window    | Pseudo-random payloads; the host reproduces the exact sequence from the seed. |
 
-The two independent variables are the **BLE advertising interval**
-(`CONFIG_ESPBENCH_ADV_INTERVAL_MS`, how often the radio broadcasts the current
-key) and, for the rotating modes, the **update interval**
-(`CONFIG_ESPBENCH_UPDATE_INTERVAL_MS`, how long each `mid` is held before moving
-to the next). A run of the rotating modes sends `CONFIG_ESPBENCH_MSG_COUNT`
-windows and then prints a `done` marker; a `static` run holds its one carrier for
-`CONFIG_ESPBENCH_STATIC_DURATION_MS` and then prints `done`.
+The two independent variables are the **BLE advertising interval** (`adv_ms`, how
+often the radio broadcasts the current key) and, for the rotating modes, the
+**update interval** (`upd_ms`, how long each `mid` is held before moving to the
+next). A run of the rotating modes sends `count` windows and then prints a `done`
+marker; a `static` run holds its one carrier for `dur_ms` and then prints `done`.
+These arrive per cell in the `run` command (see [Command protocol](#command-protocol)),
+not from a compile-time configuration.
 
 Every window is logged on a stable, host-parseable line:
 
@@ -56,57 +59,65 @@ The harness reconciles the two and warns on any disagreement, then uses the
 config-derived sequence as the canonical list of mids to fetch (robust to a
 dropped serial line).
 
-## Configuration
+## Command protocol
 
-All experiment parameters live in the `espbench configuration` menu
-(`idf.py menuconfig`, or set directly in `sdkconfig` / an sdkconfig fragment):
+Because the board is flashed once and reconfigured per cell, there are **no**
+`CONFIG_ESPBENCH_*` options and no menuconfig menu — every experiment parameter
+arrives at runtime in a single newline-terminated command over the console UART:
 
-| Option | Meaning |
-|--------|---------|
-| `ESPBENCH_MODE` | `static` / `incremental` / `random` |
-| `ESPBENCH_ADV_INTERVAL_MS` | BLE advertising interval, 20–10240 ms |
-| `ESPBENCH_UPDATE_INTERVAL_MS` | window length for rotating modes |
-| `ESPBENCH_MSG_COUNT` | number of windows for rotating modes |
-| `ESPBENCH_STATIC_DURATION_MS` | hold time for static (0 = forever) |
-| `ESPBENCH_MID_BASE` | mid of the first/only window |
-| `ESPBENCH_PAYLOAD_START` | constant byte (static) / ramp start (incremental) |
-| `ESPBENCH_RANDOM_SEED` | 32-bit PRNG seed (random) |
+```
+run uid=<64hex> mode=incremental mid=1024 adv_ms=1000 upd_ms=6000 count=30 pay=0
+run uid=<64hex> mode=random      mid=2048 adv_ms=1000 upd_ms=6000 count=30 seed=1
+run uid=<64hex> mode=static      mid=4096 adv_ms=1000 dur_ms=600000 pay=7
+# optional second independent variable on any line:  ... txdbm=9
+```
 
-`ESPBENCH_MID_BASE` matters when sweeping a matrix: every carrier is derived from
-`(uid, mid, payload)`, so two cells that reuse the same mid range on the same
-`uid` would broadcast colliding carriers on the shared relay. The harness assigns
-each cell a disjoint mid range automatically; you only set this by hand for
+| Field | Required | Meaning |
+|-------|----------|---------|
+| `uid` | yes | 64 hex chars (32 bytes), the cell's Unilink ID (RAM only) |
+| `mode` | yes | `static` / `incremental` / `random` |
+| `mid` | yes | mid of the first/only window |
+| `adv_ms` | no (1000) | BLE advertising interval, 20–10240 ms |
+| `upd_ms` | no (60000) | window length for rotating modes |
+| `count` | no (16) | number of windows for rotating modes |
+| `dur_ms` | no (600000) | hold time for static (0 = until next command) |
+| `pay` | no (0) | constant byte (static) / ramp start (incremental) |
+| `seed` | no (1) | 32-bit PRNG seed (random; must be non-zero) |
+| `txdbm` | no | override BLE advertising TX power in dBm |
+
+The device replies on the same host-parseable `run start` / `tx ...` / `done ...`
+lines as before, then loops back to read the next command. A malformed command is
+logged and skipped (the host times that cell out and retries it). `mid` matters
+when sweeping a matrix: every carrier is derived from `(uid, mid, payload)`, so
+two cells that reuse the same mid range on the same `uid` would broadcast
+colliding carriers on the shared relay. The harness assigns each cell a disjoint
+mid range **and** a fresh `uid` automatically; you only set `mid` by hand for
 standalone runs.
 
-## Provisioning
+## Build and flash
 
-Same as `espsend`: drop a 64-hex-character `uid.hex` (32 bytes) at the project
-root, or generate one with `scripts/gen_seed.py`. The build bakes it into the NVS
-image and `idf.py flash` writes it; the receiver derives carriers from the same
-`uid`.
-
-For **standalone** builds you manage `uid.hex` yourself. Under the automated
-harness you do **not** — `run_matrix.py` mints a fresh random `uid` for every
-cell (see below) and owns `uid.hex` while it runs.
-
-## Build and flash (standalone)
-
-Targets the Seeed XIAO ESP32-S3 (esp32s3, 8 MB flash).
+Targets the Seeed XIAO ESP32-S3 (esp32s3, 8 MB flash). No `uid.hex` or NVS
+provisioning is needed — the UID is supplied per cell over serial.
 
 ```sh
-idf.py menuconfig       # pick a mode + intervals under "espbench configuration"
 idf.py build flash monitor
 ```
 
+To drive it by hand, type a `run ...` command (as above) into the monitor after
+the `ready` marker appears. Under the automated harness you never do this;
+`run_matrix.py` sends the commands.
+
 ## Automated matrix runs
 
-`scripts/run_matrix.py` drives the whole experiment loop. **Launch it from an
-ESP-IDF-activated shell** (so `idf.py` is on PATH) with the board attached. For
-each cell it mints a fresh `uid`, writes an sdkconfig fragment, builds and
-flashes, resets the board and captures the serial log. It records three
-independent, append-only **time-series** as the run happens — transmission (what
-went on air), detection (what the relay returned), and density (nearby finders) —
-and joins them into the delivery metrics *offline* at the end (see
+`run_matrix.py` (at the espbench root, beside the `matrix.*.json` definitions)
+drives the whole experiment loop. **Launch it from an ESP-IDF-activated shell**
+(so `idf.py` is on PATH) with the board attached. It **flashes the generic
+firmware once**, resets the board and waits for its `ready` marker, then for each
+cell mints a fresh `uid`, sends the `run` command, and captures the serial log —
+no reflash or reboot between cells. It records three independent, append-only
+**time-series** as the run happens — transmission (what went on air), detection
+(what the relay returned), and density (nearby finders) — and joins them into the
+delivery metrics *offline* at the end (see
 [Three time-series + offline analysis](#three-time-series--offline-analysis)).
 
 ```sh
@@ -115,23 +126,29 @@ python3 -m venv scripts/.venv
 scripts/.venv/bin/pip install findmy cryptography pyserial
 
 # see how cells map onto mid ranges without touching hardware
-scripts/.venv/bin/python scripts/run_matrix.py scripts/matrix.example.json --dry-run
+scripts/.venv/bin/python run_matrix.py matrix.smoke.json --dry-run
 
 # run the matrix (first fetch logs in and saves the session to account.json)
-scripts/.venv/bin/python scripts/run_matrix.py scripts/matrix.example.json \
+scripts/.venv/bin/python run_matrix.py matrix.smoke.json \
     --port /dev/tty.usbmodem1101
 ```
 
+The low-level helpers (`bench_common.py`, `analyze.py`, `scan_density.py`, and
+the manual `fetch_reports.py` / `scan_findmy.py` / `gen_seed.py`) stay under
+`scripts/`. The merged-in offline unit tests run with
+`scripts/.venv/bin/python run_matrix.py --test` (or `python -m pytest run_matrix.py`).
+
 ### Per-cell UIDs and independence
 
-Every cell gets its own random 32-byte `uid`, so its carriers are fully
-independent of every other cell and of any earlier run: even identical
-`(mid, payload)` pairs derive different carriers under different UIDs, so nothing
-can collide on the shared relay. This is what lets you re-run the *same* matrix
-in different places without cross-contamination. Each cell's UID is saved to
-`results/<timestamp>/<cell>/uid.hex` (secret; `results/` is gitignored) so you
-can re-fetch that cell later. The mid ranges are still allocated disjointly as a
-second layer of safety and for readable logs.
+Every cell gets its own random 32-byte `uid`, sent over serial and held only in
+RAM on the device, so its carriers are fully independent of every other cell and
+of any earlier run: even identical `(mid, payload)` pairs derive different
+carriers under different UIDs, so nothing can collide on the shared relay. This is
+what lets you re-run the *same* matrix in different places without
+cross-contamination. Each cell's UID is saved to `results/<timestamp>/<cell>/uid.hex`
+(secret; `results/` is gitignored) so you can re-fetch that cell later. The mid
+ranges are still allocated disjointly as a second layer of safety and for
+readable logs.
 
 ### Measuring crowd density
 
@@ -153,7 +170,9 @@ predictor, since a finder across the building will not relay our beacon), or
 
 ### The matrix file
 
-A JSON object (see `scripts/matrix.example.json`). Top-level keys:
+A JSON object (see `matrix.smoke.json` at the espbench root; there are several
+`matrix.*.json` definitions and the runner takes the path as a CLI argument).
+Top-level keys:
 
 | Key | Default | Meaning |
 |-----|---------|---------|
@@ -166,7 +185,7 @@ A JSON object (see `scripts/matrix.example.json`). Top-level keys:
 | `detection` | — | detection/poll producer config (block; flat fallbacks below) |
 | `density` | — | density producer config (block or bool toggle; flat fallbacks below) |
 | `build_dir` | `<project>/build` | shared build directory (incremental) |
-| `results_dir` | `scripts/results` | where run artifacts are written |
+| `results_dir` | `results` | where run artifacts are written (espbench root) |
 | `cells` | — | list of experiment cells (the transmission producer) |
 
 The **`detection`** block (with backward-compatible top-level fallbacks):
@@ -243,7 +262,7 @@ many seconds of its send time (unset = ever observed).
 
 ### Output
 
-Under `scripts/results/<timestamp>/`:
+Under `results/<timestamp>/` (at the espbench root):
 
 - `transmission.csv` / `detection.csv` — the two secret series (they carry `uid`
   and decrypted GPS), gitignored. `cells.json` — the run config plus each cell's
@@ -284,12 +303,12 @@ existing run's series with `analyze.py results/<timestamp> [--deliver-window-s N
 
 ### Resilience (unattended runs)
 
-Cells are fault-isolated. If a cell fails — a transient flash/USB glitch or a
+Cells are fault-isolated. If a cell fails — a transient USB/serial glitch or a
 network blip during fetch — it is **deferred**, and the harness comes back to it
-in a **retry pass after all other cells finish** (a fresh UID and reflash on the
-retry). A cell that fails twice is given up on: its `<cell>/error.txt` records the
-error and the run continues. `summary.csv` stays in matrix order regardless of
-which cells came through the retry pass.
+in a **retry pass after all other cells finish** (a fresh UID, no reflash — the
+board stays up the whole run). A cell that fails twice is given up on: its
+`<cell>/error.txt` records the error and the run continues. `summary.csv` stays in
+matrix order regardless of which cells came through the retry pass.
 
 ### Metrics
 
@@ -350,7 +369,7 @@ project `uid.hex`, so to re-fetch a specific harness cell first copy that cell's
 saved UID into place:
 
 ```sh
-cp scripts/results/<timestamp>/<cell>/uid.hex uid.hex
+cp results/<timestamp>/<cell>/uid.hex uid.hex
 scripts/.venv/bin/python scripts/fetch_reports.py --mid-base 0 --count 16
 ```
 
@@ -361,6 +380,7 @@ servers (run on Linux/BlueZ for correct key bytes; macOS hides the MAC).
 ## Notes
 
 - After a run's `done` marker the *last* window's carrier keeps advertising until
-  reboot. This is harmless; the harness has already recorded the run.
+  the next `run` command overwrites it (or reboot). This is harmless; the harness
+  has already recorded the run, and the disjoint mids keep it from colliding.
 - `uid` is a symmetric secret; anyone holding it can read and forge
   transmissions. Keep `uid.hex` out of version control.

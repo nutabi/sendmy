@@ -21,6 +21,18 @@ CONFIG_BT_ENABLED=y
 CONFIG_BT_NIMBLE_ENABLED=y
 
 # ----------------------------------------------------------------------------
+# Console
+# ----------------------------------------------------------------------------
+
+# The XIAO ESP32-S3 exposes its console over the chip's native USB (USB
+# Serial/JTAG), not a UART bridge, so make USB Serial/JTAG the *primary* console.
+# That routes stdin (the runtime `run` command reader in espbench.c) as well as
+# stdout/logs over the USB port the host is actually connected to. With UART as
+# primary, stdin would read UART0 -- which is not wired to the USB port -- and the
+# device would never receive commands.
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+
+# ----------------------------------------------------------------------------
 # Logging
 # ----------------------------------------------------------------------------
 

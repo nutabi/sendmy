@@ -11,12 +11,16 @@ defers all interpretation to an offline join (see analyze.py):
      lat/lon/accuracy/confidence/status), deduped by report id;
   3. density -- the nearby-finder count over time (scan_density.py -> density.csv).
 
-Per cell it: writes an sdkconfig fragment, builds+flashes, resets and captures the
-serial log, and cross-checks the log against the config-derived sequence. Enqueuing
-each key into the poller the instant it starts transmitting -- and polling every
-not-yet-done key each cycle for the whole run -- is what makes propagation latency
-real: an early cell's reports keep being fetched while later cells run, so a report
-is first-seen when it truly becomes queryable, not at some end-of-run sweep.
+The board is flashed **once** with a generic, reconfigurable firmware; each cell's
+parameters (mode, intervals, mid range, and a fresh per-cell UID) are then pushed
+to the running device over serial as a `run key=val ...` command, and the device
+replies with the same `tx`/`done` log lines as before. Per cell it: mints a fresh
+UID, sends the run command, captures the serial log until the done marker, and
+cross-checks the log against the config-derived sequence. Enqueuing each key into
+the poller the instant it starts transmitting -- and polling every not-yet-done key
+each cycle for the whole run -- is what makes propagation latency real: an early
+cell's reports keep being fetched while later cells run, so a report is first-seen
+when it truly becomes queryable, not at some end-of-run sweep.
 
 Deliverability / latency / redundancy are NOT computed live; they are derived at
 the end (and re-derivable any time) by analyze.py joining the three series. So
@@ -26,7 +30,10 @@ It must be launched from an ESP-IDF-activated shell (so `idf.py` is on PATH and
 the toolchain env is set) with the board connected. See the README for the matrix
 file format.
 
-    scripts/.venv/bin/python scripts/run_matrix.py matrix.json --port /dev/tty.usbmodem1101
+    scripts/.venv/bin/python run_matrix.py matrix.smoke.json --port /dev/tty.usbmodem1101
+
+Run the merged-in offline unit tests (no hardware/network) with `--test`, or
+`python -m pytest run_matrix.py`.
 
 Dependencies: findmy, cryptography, pyserial.
 """
@@ -50,6 +57,10 @@ try:
 except ImportError:
     sys.exit("error: pyserial is required (pip install pyserial)")
 
+# The low-level helpers stay in scripts/; this runner now lives at the espbench
+# root, so put scripts/ on the path before importing them.
+sys.path.insert(0, str(Path(__file__).resolve().parent / "scripts"))
+
 import analyze
 import bench_common as bc
 
@@ -57,6 +68,9 @@ import bench_common as bc
 # precedes each, so we search rather than match.
 TX_RE = re.compile(r"tx mid=(\d+) payload=0x([0-9a-fA-F]{2}) t=(\d+)")
 DONE_RE = re.compile(r"done count=(\d+) mid_base=(\d+)")
+# Printed once by the firmware after NimBLE sync, when it is ready to accept
+# `run` commands. The host waits for this before sending the first cell.
+READY_RE = re.compile(r"espbench: ready")
 
 
 # --------------------------------------------------------------------------- #
@@ -205,89 +219,65 @@ def cells_manifest(cells: list[dict], det_cfg: dict, skew_s: float,
 # Build / flash
 # --------------------------------------------------------------------------- #
 
-def new_uid_hex(project_dir: Path) -> bytes:
-    """Mint a fresh 32-byte UID and write it to the project's uid.hex.
+def flash_once(project_dir: Path, build_dir: Path, port: str, idf_py: str) -> None:
+    """Build and flash the generic reconfigurable firmware, once for the whole run.
 
-    Each cell gets its own random UID so its carriers are fully independent of
-    every other cell (and of any earlier run): even identical (mid, payload)
-    pairs derive different carriers under different UIDs, so nothing collides on
-    the shared relay. The build bakes uid.hex into the NVS image, so this must
-    run before build_and_flash. The harness owns uid.hex while it runs; the last
-    cell's UID is left in place on exit.
+    Every cell is configured at runtime over serial (see build_command and the
+    firmware's `run` parser), so there is a single build/flash up front rather
+    than the old per-cell reflash. No sdkconfig fragment and no baked-in UID.
     """
-    uid = os.urandom(32)
-    path = project_dir / "uid.hex"
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w") as f:
-        f.write(uid.hex() + "\n")
-    return uid
-
-
-def write_fragment(cell: dict, path: Path) -> None:
-    """Emit the sdkconfig fragment that pins this cell's parameters."""
-    mode_sym = {
-        bc.MODE_STATIC: "CONFIG_ESPBENCH_MODE_STATIC",
-        bc.MODE_INCREMENTAL: "CONFIG_ESPBENCH_MODE_INCREMENTAL",
-        bc.MODE_RANDOM: "CONFIG_ESPBENCH_MODE_RANDOM",
-    }[cell["mode_int"]]
-
-    lines = [
-        f"{mode_sym}=y",
-        f"CONFIG_ESPBENCH_ADV_INTERVAL_MS={int(cell['adv_interval_ms'])}",
-        f"CONFIG_ESPBENCH_MID_BASE={cell['mid_base']}",
-        f"CONFIG_ESPBENCH_PAYLOAD_START={int(cell['payload_start'])}",
-    ]
-    if cell["mode_int"] == bc.MODE_STATIC:
-        lines.append(f"CONFIG_ESPBENCH_STATIC_DURATION_MS={int(cell['duration_ms'])}")
-    else:
-        lines.append(f"CONFIG_ESPBENCH_UPDATE_INTERVAL_MS={int(cell['update_interval_ms'])}")
-        lines.append(f"CONFIG_ESPBENCH_MSG_COUNT={int(cell['count'])}")
-    if cell["mode_int"] == bc.MODE_RANDOM:
-        lines.append(f"CONFIG_ESPBENCH_RANDOM_SEED=0x{int(cell['seed']):x}")
-    if cell.get("tx_power_dbm") is not None:
-        lines.append("CONFIG_ESPBENCH_TX_POWER_SET=y")
-        lines.append(f"CONFIG_ESPBENCH_TX_POWER_DBM={int(cell['tx_power_dbm'])}")
-
-    path.write_text("\n".join(lines) + "\n")
-
-
-def build_and_flash(project_dir: Path, build_dir: Path, fragment: Path,
-                    port: str, idf_py: str) -> None:
-    """Rebuild for the current fragment and flash the board.
-
-    Deleting the build's sdkconfig forces IDF to regenerate it from
-    sdkconfig.defaults plus our fragment, so each cell's parameters actually take
-    effect. Object files are cached, so only config-dependent sources recompile.
-    """
-    sdkconfig = build_dir / "sdkconfig"
-    if sdkconfig.exists():
-        sdkconfig.unlink()
-
-    defaults = f"{project_dir / 'sdkconfig.defaults'};{fragment}"
     cmd = [
         idf_py,
         "-C", str(project_dir),
         "-B", str(build_dir),
         "-p", port,
-        "-D", f"SDKCONFIG={sdkconfig}",
-        "-D", f"SDKCONFIG_DEFAULTS={defaults}",
         "build", "flash",
     ]
-    print(f"  building & flashing ({fragment.name}) ...", flush=True)
+    print("building & flashing espbench (once) ...", flush=True)
     _run_build(cmd)
+
+
+def build_command(cell: dict, uid: bytes) -> str:
+    """Compose the `run key=val ...` line the firmware parses for one cell.
+
+    Mirrors espbench.c's parser: uid/mode/mid are required; the rest map to the
+    cell's runtime parameters. The line is newline-terminated so the device's
+    fgets() sees a complete command.
+    """
+    parts = [
+        "run",
+        f"uid={uid.hex()}",
+        f"mode={cell['mode']}",
+        f"mid={cell['mid_base']}",
+        f"adv_ms={int(cell['adv_interval_ms'])}",
+    ]
+    if cell["mode_int"] == bc.MODE_STATIC:
+        parts.append(f"dur_ms={int(cell['duration_ms'])}")
+        parts.append(f"pay={int(cell['payload_start'])}")
+    else:
+        parts.append(f"upd_ms={int(cell['update_interval_ms'])}")
+        parts.append(f"count={int(cell['count'])}")
+        if cell["mode_int"] == bc.MODE_RANDOM:
+            parts.append(f"seed={int(cell['seed'])}")
+        else:  # incremental
+            parts.append(f"pay={int(cell['payload_start'])}")
+    if cell.get("tx_power_dbm") is not None:
+        parts.append(f"txdbm={int(cell['tx_power_dbm'])}")
+    return " ".join(parts) + "\n"
 
 
 def park_board(port: str, esptool: str = "esptool.py") -> None:
     """Leave the board halted in the ROM bootloader so it stops advertising.
 
-    espbench is a one-way beacon with no serial command channel, and after a
-    cell's `done` marker the firmware keeps advertising its last carrier until
-    reset. To stop the radio without a firmware change we reset the chip *into*
-    the ROM serial bootloader (`--before default_reset`) and then decline the
-    final reset (`--after no_reset`): the application never starts, so NimBLE
-    never comes up and nothing is advertised until the next reset/power-cycle.
-    `chip_id` is just a trivial op to hang the reset behaviour on. Best-effort:
-    a failure here only means the board keeps beaconing, so we warn, not abort.
+    After a cell's `done` marker the firmware keeps advertising its last carrier
+    until the next command or reset. To stop the radio at the end of a run we
+    reset the chip *into* the ROM serial bootloader (`--before default_reset`)
+    and then decline the final reset (`--after no_reset`): the application never
+    starts, so NimBLE never comes up and nothing is advertised until the next
+    reset/power-cycle. `chip_id` is just a trivial op to hang the reset behaviour
+    on. Best-effort: a failure here only means the board keeps beaconing, so we
+    warn, not abort. The caller must close the serial port first (esptool needs
+    it).
     """
     cmd = [esptool, "--port", port, "--before", "default_reset",
            "--after", "no_reset", "chip_id"]
@@ -315,9 +305,33 @@ def _run_build(cmd: list[str]) -> None:
 # Serial capture
 # --------------------------------------------------------------------------- #
 
-def capture_run(port: str, baud: int, timeout_s: float,
+def reset_board(ser: serial.Serial) -> None:
+    """esp32 auto-reset: pulse EN (RTS) to restart the board from boot.
+
+    Done once before the cell loop so the firmware comes up clean and prints its
+    ready marker; individual cells are then driven by serial commands, no reset.
+    """
+    ser.setDTR(False)
+    ser.setRTS(True)
+    time.sleep(0.1)
+    ser.setRTS(False)
+
+
+def wait_ready(ser: serial.Serial, timeout_s: float) -> bool:
+    """Read the serial log until the firmware's ready marker, or timeout."""
+    deadline = time.time() + timeout_s
+    while time.time() < deadline:
+        line = ser.readline().decode("utf-8", errors="replace").rstrip("\r\n")
+        if not line:
+            continue
+        if READY_RE.search(line):
+            return True
+    return False
+
+
+def capture_run(ser: serial.Serial, timeout_s: float, command: str,
                 on_tx=None) -> tuple[list[dict], list[str]]:
-    """Reset the board and record its serial log until the done marker.
+    """Send one cell's run command and record the serial log until the done marker.
 
     Returns (observed, raw_lines) where observed is a list of
     {mid, payload, device_ms, host_time} dicts for each tx line seen.
@@ -329,38 +343,36 @@ def capture_run(port: str, baud: int, timeout_s: float,
     observed: list[dict] = []
     raw: list[str] = []
 
-    with serial.Serial(port, baud, timeout=1) as ser:
-        # esp32 auto-reset: pulse EN (RTS) to restart from boot so we catch the
-        # whole run, including the "run start" banner.
-        ser.setDTR(False)
-        ser.setRTS(True)
-        time.sleep(0.1)
-        ser.setRTS(False)
+    # Drop any leftover chatter (e.g. the previous cell's last-carrier logs) so
+    # stale tx lines are never misattributed to this cell, then issue the command.
+    ser.reset_input_buffer()
+    ser.write(command.encode())
+    ser.flush()
 
-        deadline = time.time() + timeout_s
-        while time.time() < deadline:
-            line = ser.readline().decode("utf-8", errors="replace").rstrip("\r\n")
-            if not line:
-                continue
-            raw.append(line)
-            m = TX_RE.search(line)
-            if m:
-                mid = int(m.group(1))
-                payload = int(m.group(2), 16)
-                host_time = time.time()
-                observed.append({
-                    "mid": mid,
-                    "payload": payload,
-                    "device_ms": int(m.group(3)),
-                    "host_time": host_time,
-                })
-                if on_tx is not None:
-                    on_tx(mid, payload, host_time)
-                print(f"    tx mid={m.group(1)} payload=0x{m.group(2)}", flush=True)
-                continue
-            if DONE_RE.search(line):
-                print("    run done", flush=True)
-                return observed, raw
+    deadline = time.time() + timeout_s
+    while time.time() < deadline:
+        line = ser.readline().decode("utf-8", errors="replace").rstrip("\r\n")
+        if not line:
+            continue
+        raw.append(line)
+        m = TX_RE.search(line)
+        if m:
+            mid = int(m.group(1))
+            payload = int(m.group(2), 16)
+            host_time = time.time()
+            observed.append({
+                "mid": mid,
+                "payload": payload,
+                "device_ms": int(m.group(3)),
+                "host_time": host_time,
+            })
+            if on_tx is not None:
+                on_tx(mid, payload, host_time)
+            print(f"    tx mid={m.group(1)} payload=0x{m.group(2)}", flush=True)
+            continue
+        if DONE_RE.search(line):
+            print("    run done", flush=True)
+            return observed, raw
 
     print("    warning: capture timed out before the done marker", file=sys.stderr)
     return observed, raw
@@ -384,14 +396,17 @@ def reconcile(cell: dict, observed: list[dict]) -> list[str]:
 
 
 def estimate_timeout(cell: dict) -> float:
-    """How long to wait for the run's done marker, with boot + slack margin."""
-    boot_margin = 20.0
+    """How long to wait for the run's done marker, with a slack margin.
+
+    The board boots once up front (wait_ready), so no per-cell boot margin is
+    needed; a cell command runs on the already-live firmware.
+    """
     if cell["mode_int"] == bc.MODE_STATIC:
         run_s = int(cell["duration_ms"]) / 1000.0
     else:
         # count windows plus the firmware's trailing update-interval delay.
         run_s = (int(cell["count"]) + 1) * int(cell["update_interval_ms"]) / 1000.0
-    return run_s + boot_margin + 30.0
+    return run_s + 30.0
 
 
 # --------------------------------------------------------------------------- #
@@ -620,6 +635,12 @@ def single_sweep(account, writer: SeriesWriter, tx_records: list[dict], *,
 # --------------------------------------------------------------------------- #
 
 def main() -> None:
+    # `--test` runs the merged-in offline unit tests (no hardware/network) and
+    # exits, so the matrix positional is not required for it.
+    if "--test" in sys.argv:
+        _run_all()
+        return
+
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("matrix", type=Path, help="matrix JSON file")
@@ -673,7 +694,7 @@ def main() -> None:
         sys.exit("error: no serial port (pass --port or set 'port' in the matrix)")
 
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    results_dir = Path(matrix.get("results_dir", bc.SCRIPT_DIR / "results")) / run_id
+    results_dir = Path(matrix.get("results_dir", bc.PROJECT_ROOT / "results")) / run_id
     results_dir.mkdir(parents=True, exist_ok=True)
     print(f"results -> {results_dir}")
 
@@ -683,10 +704,22 @@ def main() -> None:
         cells_manifest(cells, det_cfg, skew_s, deliver_window_s, run_id),
         indent=2) + "\n")
 
-    # In --no-flash mode we cannot re-provision the board, so every cell shares
-    # whatever UID is already flashed (the project uid.hex). When flashing, each
-    # cell mints its own UID just before its build (below).
-    shared_uid = bc.read_uid() if args.no_flash else None
+    # Flash the generic firmware once, before opening the serial port (esptool
+    # needs the port). Every cell is then configured at runtime over serial.
+    if not args.no_flash:
+        flash_once(project_dir, build_dir, port, idf_py)
+
+    # One serial connection for the whole capture phase. Boot the firmware once
+    # and wait for its ready marker; each cell is then driven by a command with
+    # no reset in between. Opened before the writers/poller/density logger so a
+    # bad port fails fast without leaving them running.
+    ser = serial.Serial(port, args.baud, timeout=1)
+    print("resetting board, waiting for ready ...", flush=True)
+    reset_board(ser)
+    if not wait_ready(ser, 30.0):
+        print("warning: did not see the ready marker within 30s; sending commands "
+              "anyway", file=sys.stderr)
+
     account = None if args.no_fetch else bc.load_account()
 
     poll = det_cfg["poll"] and not args.no_fetch and not args.no_poll
@@ -732,26 +765,21 @@ def main() -> None:
         poller.start()
 
     def process_cell(cell: dict) -> None:
-        """Flash, capture, and record one cell's transmissions.
+        """Send one cell's command, capture, and record its transmissions.
 
-        Enqueues each key into the poller and appends the transmission row the
+        Mints a fresh per-cell UID (kept in RAM on the device, so no reflash),
+        enqueues each key into the poller, and appends the transmission row the
         instant it goes on air. Raises on any failure so the caller can defer the
         cell to the retry pass.
         """
         cell_dir = results_dir / cell["name"]
         cell_dir.mkdir(exist_ok=True)
 
-        if not args.no_flash:
-            uid = new_uid_hex(project_dir)
-            # Record this cell's UID so its mids can be re-fetched later (secret;
-            # results/ is gitignored). A retry mints a fresh UID and reflashes.
-            (cell_dir / "uid.hex").write_text(uid.hex() + "\n")
-            build_dir.mkdir(parents=True, exist_ok=True)
-            fragment = build_dir / "bench_cell.conf"
-            write_fragment(cell, fragment)
-            build_and_flash(project_dir, build_dir, fragment, port, idf_py)
-        else:
-            uid = shared_uid
+        # Every cell (including a retry) gets its own random UID, so even
+        # identical (mid, payload) pairs derive independent carriers. Record it
+        # so the cell's mids can be re-fetched later (secret; results/ gitignored).
+        uid = os.urandom(32)
+        (cell_dir / "uid.hex").write_text(uid.hex() + "\n")
 
         def on_tx(mid: int, payload: int, host_time: float) -> None:
             tx_writer.append({"cell": cell["name"], "uid": uid.hex(), "mid": mid,
@@ -762,7 +790,8 @@ def main() -> None:
             if poller is not None:
                 poller.enqueue(cell["name"], uid, mid, payload, host_time)
 
-        observed, raw = capture_run(port, args.baud, estimate_timeout(cell), on_tx=on_tx)
+        command = build_command(cell, uid)
+        observed, raw = capture_run(ser, estimate_timeout(cell), command, on_tx=on_tx)
         (cell_dir / "serial.log").write_text("\n".join(raw) + "\n")
 
         for w in reconcile(cell, observed):
@@ -831,6 +860,8 @@ def main() -> None:
                 snapshot = list(tx_records)
             single_sweep(account, det_writer, snapshot, skew_s=skew_s)
     finally:
+        # Close the serial port before park_board (esptool needs it).
+        ser.close()
         tx_writer.close()
         if det_writer is not None:
             det_writer.close()
@@ -875,6 +906,316 @@ def _group_uids(tx_records: list[dict]) -> dict[str, list[dict]]:
     for r in tx_records:
         out.setdefault(r["cell"], []).append(r)
     return out
+
+
+# =========================================================================== #
+# Offline unit tests (merged from the former scripts/test_run_matrix.py)
+# =========================================================================== #
+#
+# These exercise the recording + analysis logic without hardware or the network:
+# the poller's fetch is monkeypatched to serve synthetic report records, so no
+# Apple account is touched. Run with:
+#
+#     scripts/.venv/bin/python run_matrix.py --test
+#     # or, via pytest:
+#     scripts/.venv/bin/python -m pytest run_matrix.py -q
+
+
+def _iso(epoch: float) -> str:
+    return datetime.fromtimestamp(epoch, tz=timezone.utc).isoformat()
+
+
+def _record(rid: str, obs_epoch: float, payload_hint: int = 0) -> dict:
+    """A synthetic decrypted report record shaped like bench_common produces."""
+    return {
+        "id": rid,
+        "timestamp": _iso(obs_epoch),
+        "latitude": 1.2924 + payload_hint * 1e-6,
+        "longitude": 103.772,
+        "horizontal_accuracy": 50.0,
+        "confidence": 2,
+        "status": 0,
+    }
+
+
+class FakeAccount:
+    """Stands in for AppleAccount; never touches the network."""
+
+
+def install_fake_fetch(monkey_reports):
+    """Patch bench_common.fetch_reports_for_mid to serve a scripted table.
+
+    `monkey_reports` maps (uid_hex, mid) -> {payload: [records]}. Applies the
+    `since_epoch`/`skew_s` floor exactly like the real helper, so the timeout /
+    window logic is exercised against realistic filtering.
+    """
+    def fake(account, uid, mid, *, since_epoch=None, skew_s=0.0):
+        table = monkey_reports.get((uid.hex(), mid), {})
+        floor = None if since_epoch is None else since_epoch - skew_s
+        out = {}
+        for payload, recs in table.items():
+            kept = [r for r in recs
+                    if floor is None
+                    or datetime.fromisoformat(r["timestamp"]).timestamp() >= floor]
+            if kept:
+                out[payload] = kept
+        return out
+    original = bc.fetch_reports_for_mid
+    bc.fetch_reports_for_mid = fake
+    return original
+
+
+def test_adaptive_timeout_full_below_cap():
+    assert adaptive_timeout(300.0, queue_size=1, soft_cap=8) == 300.0
+    assert adaptive_timeout(300.0, queue_size=8, soft_cap=8) == 300.0
+
+
+def test_adaptive_timeout_shrinks_with_backlog():
+    # At 2x the soft cap the effective timeout should halve; strictly decreasing.
+    assert adaptive_timeout(300.0, queue_size=16, soft_cap=8) == 150.0
+    assert adaptive_timeout(300.0, queue_size=32, soft_cap=8) == 75.0
+    big = [adaptive_timeout(300.0, q, 8) for q in (8, 12, 24, 48)]
+    assert big == sorted(big, reverse=True)
+
+
+class RecordingWriter:
+    """Captures appended rows instead of writing a file."""
+
+    def __init__(self):
+        self.rows = []
+        self._lock = threading.Lock()
+
+    def append(self, row):
+        with self._lock:
+            self.rows.append(dict(row))
+
+    def close(self):
+        pass
+
+
+def _make_poller(writer, reports, **kw):
+    install_fake_fetch(reports)
+    stop = threading.Event()
+    cfg = dict(interval_s=1.0, detections_before_remove=1, lost_timeout_s=300.0,
+               queue_soft_cap=8, skew_s=120.0, stop_event=stop)
+    cfg.update(kw)
+    poller = DetectionPoller(FakeAccount(), writer, **cfg)
+    return poller, stop
+
+
+def test_enqueue_on_tx_and_per_key_uid_fetch():
+    # Two cells, two distinct uids and mids; each key must be fetched under its
+    # own uid, and its detection row carries that uid.
+    uid_a = bytes([0xAA] * 32)
+    uid_b = bytes([0xBB] * 32)
+    now = time.time()
+    reports = {
+        (uid_a.hex(), 10): {5: [_record("a1", now)]},
+        (uid_b.hex(), 20): {7: [_record("b1", now)]},
+    }
+    writer = RecordingWriter()
+    poller, _ = _make_poller(writer, reports, detections_before_remove=1)
+    poller.enqueue("cellA", uid_a, 10, 5, now)
+    poller.enqueue("cellB", uid_b, 20, 7, now)
+    poller.poll_once()
+
+    by_id = {r["report_id"]: r for r in writer.rows}
+    assert by_id["a1"]["uid"] == uid_a.hex() and by_id["a1"]["mid"] == 10
+    assert by_id["b1"]["uid"] == uid_b.hex() and by_id["b1"]["mid"] == 20
+    # first_fetched_at stamped on the fetch that first returned each id.
+    assert by_id["a1"]["first_fetched_at"] >= now
+    # Both keys hit detections_before_remove=1, so the queue drains.
+    assert poller.queue_size() == 0
+
+
+def test_detections_before_remove_bounds_rows_then_drops():
+    uid = bytes([0x11] * 32)
+    now = time.time()
+    # Three distinct observations available for the same key.
+    reports = {(uid.hex(), 3): {0: [_record("r1", now), _record("r2", now + 1),
+                                    _record("r3", now + 2)]}}
+    writer = RecordingWriter()
+    poller, _ = _make_poller(writer, reports, detections_before_remove=2)
+    poller.enqueue("c", uid, 3, 0, now)
+
+    poller.poll_once()
+    # Logs up to the budget of 2 in the first cycle, then the key is dropped.
+    assert len(writer.rows) == 2
+    assert poller.queue_size() == 0
+    # A second cycle adds nothing (key gone from the queue).
+    poller.poll_once()
+    assert len(writer.rows) == 2
+
+
+def test_unbounded_budget_keeps_key_and_dedups():
+    uid = bytes([0x22] * 32)
+    now = time.time()
+    table = {0: [_record("r1", now)]}
+    reports = {(uid.hex(), 4): table}
+    writer = RecordingWriter()
+    poller, _ = _make_poller(writer, reports, detections_before_remove=0,
+                             lost_timeout_s=10_000)
+    poller.enqueue("c", uid, 4, 0, now)
+
+    poller.poll_once()
+    assert len(writer.rows) == 1 and poller.queue_size() == 1  # unbounded -> stays
+    # A new observation appears; the old id must not be re-logged.
+    table[0].append(_record("r2", now + 1))
+    poller.poll_once()
+    ids = [r["report_id"] for r in writer.rows]
+    assert ids == ["r1", "r2"] and poller.queue_size() == 1
+
+
+def test_first_fetched_at_stamped_once():
+    uid = bytes([0x33] * 32)
+    now = time.time()
+    reports = {(uid.hex(), 9): {0: [_record("r1", now)]}}
+    writer = RecordingWriter()
+    poller, _ = _make_poller(writer, reports, detections_before_remove=5,
+                             lost_timeout_s=10_000)
+    poller.enqueue("c", uid, 9, 0, now)
+    poller.poll_once()
+    stamp = writer.rows[0]["first_fetched_at"]
+    time.sleep(0.02)
+    poller.poll_once()  # id already seen -> no new row, stamp unchanged
+    assert len(writer.rows) == 1 and writer.rows[0]["first_fetched_at"] == stamp
+
+
+def test_unseen_key_dropped_after_timeout_no_detection():
+    uid = bytes([0x44] * 32)
+    now = time.time()
+    reports = {}  # nothing ever returned -> the key stays unseen
+    writer = RecordingWriter()
+    poller, _ = _make_poller(writer, reports, lost_timeout_s=50)
+    # Enqueue with a send_time already past the timeout.
+    poller.enqueue("c", uid, 1, 0, now - 100)
+    poller.poll_once()
+    assert writer.rows == [] and poller.queue_size() == 0
+
+
+def test_adaptive_shrink_drops_backlogged_unseen_keys():
+    # A large backlog of unseen keys, all older than the shrunk timeout but
+    # younger than the base timeout, must be dropped once the queue exceeds cap.
+    uid = bytes([0x55] * 32)
+    now = time.time()
+    writer = RecordingWriter()
+    poller, _ = _make_poller(writer, {}, lost_timeout_s=300, queue_soft_cap=4)
+    # 40 keys aged 100s: effective timeout = 300 * 4 / 40 = 30s < 100s -> drop all.
+    for i in range(40):
+        poller.enqueue("c", uid, 100 + i, 0, now - 100)
+    poller.poll_once()
+    assert poller.queue_size() == 0
+    # With the same age but a small queue, the full 300s timeout keeps the key.
+    poller.enqueue("c", uid, 999, 0, now - 100)
+    poller.poll_once()
+    assert poller.queue_size() == 1
+
+
+def test_poller_thread_runs_and_drains():
+    uid = bytes([0x66] * 32)
+    now = time.time()
+    reports = {(uid.hex(), 7): {0: [_record("r1", now)]}}
+    writer = RecordingWriter()
+    poller, stop = _make_poller(writer, reports, interval_s=0.05)
+    poller.start()
+    poller.enqueue("c", uid, 7, 0, now)
+    deadline = time.time() + 5
+    while poller.queue_size() > 0 and time.time() < deadline:
+        time.sleep(0.05)
+    stop.set()
+    poller.join(timeout=5)
+    assert [r["report_id"] for r in writer.rows] == ["r1"]
+
+
+def _cell(name="c", mid_base=10, expected=None):
+    return {
+        "name": name, "mode": "incremental", "adv_interval_ms": 1000,
+        "update_interval_ms": 60000, "duration_ms": 0, "count": 1,
+        "mid_base": mid_base,
+        "expected": expected if expected is not None else [[mid_base, 5]],
+    }
+
+
+def _tx_row(cell, uid, mid, payload, send_time):
+    return {"cell": cell, "uid": uid, "mid": mid, "payload": payload,
+            "send_time": send_time}
+
+
+def _det_row(cell, uid, mid, payload, rid, obs_epoch, ff_epoch):
+    return {"cell": cell, "uid": uid, "mid": mid, "payload": payload,
+            "report_id": rid, "obs_timestamp": _iso(obs_epoch),
+            "first_fetched_at": ff_epoch, "latitude": "1.29", "longitude": "103.77",
+            "horizontal_accuracy": "50", "confidence": "2", "status": "0"}
+
+
+def test_analyze_deliverability_latency_propagation():
+    send = 1_000_000.0
+    cell = _cell(expected=[[10, 5]])
+    tx = [_tx_row("c", "aa", 10, 5, send)]
+    # observed 60s after send; first fetched 90s later -> propagation 30s.
+    det = [_det_row("c", "aa", 10, 5, "r1", send + 60, send + 90),
+           _det_row("c", "aa", 10, 5, "r2", send + 62, send + 92)]
+    res = analyze.analyze_cell(cell, tx, det, deliver_window_s=None,
+                               skew_s=120.0, polled=True)
+    assert res["delivered"] == 1 and res["correct"] == 1
+    assert res["deliverability"] == 1.0
+    assert abs(res["latency_median_s"] - 60.0) < 1e-6      # discovery
+    assert abs(res["propagation_min_s"] - 30.0) < 1e-6     # first_fetched - obs
+    assert res["reports_per_delivered_median"] == 2        # redundancy depth
+
+
+def test_analyze_wrong_payload_is_delivered_not_correct():
+    send = 2_000_000.0
+    cell = _cell(expected=[[10, 5]])
+    tx = [_tx_row("c", "aa", 10, 5, send)]
+    det = [_det_row("c", "aa", 10, 9, "r1", send + 30, send + 40)]  # payload 9 != 5
+    res = analyze.analyze_cell(cell, tx, det, deliver_window_s=None,
+                               skew_s=120.0, polled=True)
+    assert res["delivered"] == 1 and res["correct"] == 0
+
+
+def test_analyze_deliver_window_excludes_late_report():
+    send = 3_000_000.0
+    cell = _cell(expected=[[10, 5]])
+    tx = [_tx_row("c", "aa", 10, 5, send)]
+    det = [_det_row("c", "aa", 10, 5, "r1", send + 500, send + 520)]  # 500s later
+    # A 300s window rejects the late report -> not delivered.
+    res = analyze.analyze_cell(cell, tx, det, deliver_window_s=300.0,
+                               skew_s=120.0, polled=True)
+    assert res["delivered"] == 0
+    # An open window (None) accepts it.
+    res2 = analyze.analyze_cell(cell, tx, det, deliver_window_s=None,
+                                skew_s=120.0, polled=True)
+    assert res2["delivered"] == 1
+
+
+def test_analyze_never_seen_window_censored_from_latency():
+    send = 4_000_000.0
+    cell = _cell(expected=[[10, 5], [11, 6]])
+    tx = [_tx_row("c", "aa", 10, 5, send), _tx_row("c", "aa", 11, 6, send + 60)]
+    det = [_det_row("c", "aa", 10, 5, "r1", send + 30, send + 40)]  # only mid 10
+    res = analyze.analyze_cell(cell, tx, det, deliver_window_s=None,
+                               skew_s=120.0, polled=True)
+    assert res["windows"] == 2 and res["delivered"] == 1
+    assert res["latency_n"] == 1  # the lost window is censored, not counted slow
+
+
+def _run_all() -> None:
+    fns = [v for k, v in sorted(globals().items())
+           if k.startswith("test_") and callable(v)]
+    passed = 0
+    for fn in fns:
+        original = bc.fetch_reports_for_mid
+        try:
+            fn()
+            passed += 1
+            print(f"PASS {fn.__name__}")
+        except Exception as exc:  # noqa: BLE001
+            print(f"FAIL {fn.__name__}: {exc!r}")
+            raise
+        finally:
+            bc.fetch_reports_for_mid = original
+    print(f"\n{passed}/{len(fns)} passed")
 
 
 if __name__ == "__main__":

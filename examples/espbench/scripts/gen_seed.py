@@ -6,11 +6,11 @@ receiver both hold it, and it is the HKDF pseudorandom key from which every
 carrier is derived (see components/sendmy). It is used directly -- there is no
 further key-derivation stage -- so it must have full 256-bit entropy.
 
-The UID is written to uid.hex at the repo root by default. From there,
-gen_nvs_csv.py bakes it into the NVS image flashed to the device (namespace
-`sendmy`, key `uid`), and the host-side receiver (fetch_reports.py) reads the
-same uid.hex to derive the carriers it queries. Re-running this script mints a
-brand-new, unrelated UID, invalidating any previously provisioned device.
+The UID is written to uid.hex at the project root by default. espbench no longer
+provisions a device UID (run_matrix.py sends a fresh per-cell UID over serial), so
+this is now a convenience for the manual receiver only: the host-side
+fetch_reports.py reads the same uid.hex to derive the carriers it queries.
+Re-running this script mints a brand-new, unrelated UID.
 
 Two sources of UID bytes:
 
@@ -25,7 +25,7 @@ Two sources of UID bytes:
     channel brute-forceable. Not for high-value deployments.
 
 The UID is written as a single line of lowercase hex (64 chars + newline), the
-all-hex convention the rest of the tooling (gen_nvs_csv.py) consumes.
+all-hex convention the rest of the tooling (fetch_reports.py) consumes.
 
 WARNING: uid.hex is the shared secret in plaintext -- anyone holding it can
 derive every carrier and read the channel. It is written with 0600 permissions;
