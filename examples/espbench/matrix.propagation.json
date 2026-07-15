@@ -1,0 +1,20 @@
+{
+  "settle_seconds": 900,
+  "report_floor_skew_s": 120,
+  "detection": {
+    "poll": true,
+    "poll_interval_s": 20,
+    "detections_before_remove": 0,
+    "lost_timeout_s": 600,
+    "queue_soft_cap": 8
+  },
+  "density": { "enabled": true, "interval_s": 60, "window_s": 10 },
+  "cells": [
+    { "name": "soak_1", "mode": "static", "adv_interval_ms": 1000, "duration_ms": 2700000, "payload_start": 1 },
+    { "name": "soak_2", "mode": "static", "adv_interval_ms": 1000, "duration_ms": 2700000, "payload_start": 2 },
+    { "name": "soak_3", "mode": "static", "adv_interval_ms": 1000, "duration_ms": 2700000, "payload_start": 3 },
+    { "name": "soak_4", "mode": "static", "adv_interval_ms": 1000, "duration_ms": 2700000, "payload_start": 4 },
+    { "name": "soak_5", "mode": "static", "adv_interval_ms": 1000, "duration_ms": 2700000, "payload_start": 5 },
+    { "name": "soak_6", "mode": "static", "adv_interval_ms": 1000, "duration_ms": 2700000, "payload_start": 6 }
+  ]
+}
