@@ -187,6 +187,7 @@ void app_main(void)
         return;  // nothing to send without a sensor
     }
 
-    // Bring up NimBLE; on_ready fires after host sync, advertising every 1000 ms.
-    ESP_ERROR_CHECK(sm_ll_init(on_ready, 1000));
+    // Bring up NimBLE; on_ready fires after host sync. The link layer defaults
+    // to a 1000 ms advertising interval (SM_LL_DEFAULT_ADV_INTERVAL_MS).
+    ESP_ERROR_CHECK(sm_ll_init(on_ready));
 }

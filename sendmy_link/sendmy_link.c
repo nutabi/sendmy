@@ -76,22 +76,15 @@ static esp_err_t apply_tx_power(void);
  * ----------------------------------------------------------------------------
  */
 
-esp_err_t sm_ll_init(void (*on_ready)(void), uint32_t adv_interval_ms)
+esp_err_t sm_ll_init(void (*on_ready)(void))
 {
-    // BLE advertising uses 0.625 ms units; valid HCI range is 0x20..0x4000,
-    // i.e. 20..10240 ms. Out-of-range values convert to an out-of-spec interval
-    // and advertising would silently fail to start.
-    if (adv_interval_ms < 20 || adv_interval_ms > 10240) {
-        ESP_LOGE(TAG, "adv_interval_ms %lu out of range [20, 10240]", (unsigned long)adv_interval_ms);
-        return ESP_ERR_INVALID_ARG;
-    }
-
     // A bunch of initialisation stuff, nothing special here
 
     s_on_ready = on_ready;
-    s_adv_interval_ms = adv_interval_ms;
+    // Start at the default interval; callers override via sm_ll_set_adv_interval().
+    s_adv_interval_ms = SM_LL_DEFAULT_ADV_INTERVAL_MS;
 
-    ESP_LOGI(TAG, "initialising OF advertising (interval %lu ms)", (unsigned long)adv_interval_ms);
+    ESP_LOGI(TAG, "initialising OF advertising (interval %lu ms)", (unsigned long)s_adv_interval_ms);
 
     esp_err_t err = nimble_port_init();
     if (err != ESP_OK) {
@@ -158,6 +151,31 @@ esp_err_t sm_ll_set_tx_power(int8_t dbm)
     // before the first packet regardless of how init and this call interleave.
     s_tx_power_dbm = dbm;
     s_tx_power_pending = true;
+    return ESP_OK;
+}
+
+esp_err_t sm_ll_set_adv_interval(uint32_t adv_interval_ms)
+{
+    if (!s_inited) {
+        // The interval is stored for adv_apply(), which only runs once the
+        // controller is up (via sm_ll_init); calling before that is a usage error.
+        ESP_LOGE(TAG, "set_adv_interval called before init");
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    // BLE advertising uses 0.625 ms units; valid HCI range is 0x20..0x4000,
+    // i.e. 20..10240 ms. Out-of-range values convert to an out-of-spec interval
+    // and advertising would silently fail to start.
+    if (adv_interval_ms < 20 || adv_interval_ms > 10240) {
+        ESP_LOGE(TAG, "adv_interval_ms %lu out of range [20, 10240]", (unsigned long)adv_interval_ms);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Store only. adv_apply() reads s_adv_interval_ms fresh on every
+    // advertisement, and every caller sets the interval before the next
+    // sm_ll_set_key()/host sync, so the new value is in effect from the next
+    // packet on.
+    s_adv_interval_ms = adv_interval_ms;
     return ESP_OK;
 }
 

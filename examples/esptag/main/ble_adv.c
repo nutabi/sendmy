@@ -51,8 +51,13 @@ status_t ble_adv_init(tag_t *tag)
 #endif  // CONFIG_ESPTAG_ROTATE_ENABLE
 
     // sendmy_link is a standalone component returning esp_err_t; collapse it to
-    // the firmware's status_t convention at this boundary.
-    return sm_ll_init(on_ready, CONFIG_ESPTAG_ADV_INTERVAL_MS) == ESP_OK ? STATUS_OK : STATUS_ERR;
+    // the firmware's status_t convention at this boundary. The advertising
+    // interval is now a runtime setter, applied here right after init and before
+    // the first key is published in on_ready.
+    if (sm_ll_init(on_ready) != ESP_OK) {
+        return STATUS_ERR;
+    }
+    return sm_ll_set_adv_interval(CONFIG_ESPTAG_ADV_INTERVAL_MS) == ESP_OK ? STATUS_OK : STATUS_ERR;
 }
 
 /* Static helper implementation */
