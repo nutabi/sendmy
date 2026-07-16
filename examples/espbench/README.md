@@ -269,6 +269,16 @@ ground truth. `deliver_window_s` is the query-time deliverability definition: a
 window counts as delivered only if its expected payload was observed within that
 many seconds of its send time (unset = ever observed).
 
+**Ground-truth resweep.** For authoritative deliverability independent of the
+live poller, `resweep.py results/<timestamp>` re-fetches every transmitted key
+straight from the relay (no queue cap, no adaptive timeout) and writes
+`cell,delivered,total`. It is re-runnable — a later sweep picks up
+slow-propagating weak-signal reports the first missed — and `--index LO-HI`
+resweeps a subset (e.g. to recover the tail of a run that lost the board partway).
+Feed the CSV(s) to `analyze2d.py --resweep a.csv [--resweep b.csv] --final` for
+the TX × rotation surface and cell-level significance tests; passing several CSVs
+combines runs, with a later CSV overriding an earlier one per cell.
+
 ### Output
 
 Under `results/<timestamp>/` (at the espbench root):
@@ -416,6 +426,52 @@ queue-pressure gradient, since u06 packs the most keys per unit time and so
 suffers the largest backlog and the worst under-count. **Read deliverability from
 an offline sweep (`analyze.py` over the detection series, or a fresh re-fetch),
 never from the live poller's detection counts.**
+
+### TX-power × rotation sweep — rotation is everything, TX power is nothing
+
+**Parameters.** 120 cells, **2000 ms** advertising interval, 20 windows each,
+crossing two independent variables: **TX power** at the low tail of the radio —
+**−12/−15/−18/−21/−24 dBm** (−24 dBm is the hardware floor) — against **rotation
+interval** (time each `mid` is held on air before the next) at **4/8/16 s**. That
+is 5 × 3 = 15 conditions, 8 reps (cells) apiece. Detection was deliberately
+generous (fetch every 60 s, drop a key after 1 detection, 600 s base patience,
+queue soft-cap 200) so the run needed no live-poller rescue, but deliverability
+is still taken from the offline ground-truth resweep.
+
+**Goal.** Emulating a very weak backscatter transmitter: does dialing TX power
+down toward the hardware floor degrade deliverability, and how does it trade off
+against rotation interval? The `−24 dBm` floor is still far stronger than a real
+backscatter reflection, so this probes the *approach* to the weak-signal regime.
+
+**Statistics.** Deliverability is the ground-truth resweep (`resweep.py`), read
+with `analyze2d.py --resweep … --final` (cell-level permutation tests, so the
+p-values respect the fact that a cell's 20 keys are clustered). A first sweep
+right after the run gave 89.1%; a second sweep of the later-finishing cells a few
+hours on rose to **90.4% overall (2169/2400 keys)** as slow, weak-signal reports
+kept trickling in — the same propagation tail the live poller cannot wait out.
+
+| TX (dBm) | r4 | r8 | r16 | **row** |
+|----------|-----|-----|-----|---------|
+| −12 | 76.9% | 94.4% | 99.4% | 90.2% |
+| −15 | 76.9% | 93.8% | 98.1% | 89.6% |
+| −18 | 84.4% | 91.2% | 98.8% | 91.5% |
+| −21 | 81.9% | 92.5% | 99.4% | 91.2% |
+| −24 | 80.6% | 88.8% | 98.8% | 89.4% |
+| **col** | **80.1%** | **92.1%** | **98.9%** | **90.4%** |
+
+**Result.** **Rotation interval dominates and TX power does not matter.** Across
+the whole −12 → −24 dBm tail deliverability is flat (row means 89–91%,
+permutation **p = 0.94**) — the radio floor is still far too strong to starve the
+finder network. Rotation, by contrast, is a large monotonic effect (80.1% → 92.1%
+→ 98.9%, **p < 0.0001**): the longer a `mid` stays on air, the more likely a
+finder observes it before it rotates away. The two goals pull opposite ways —
+**16 s maximizes per-key delivery (~99%)** while **4 s maximizes throughput**
+(~11–12 keys/min delivered vs ~3.7 at 16 s, since it cycles 4× as many keys
+despite the lower per-key rate). Practical implication: pick rotation for the
+deliverability/throughput balance you want, spend TX power freely on power budget,
+and note that because even the −24 dBm floor is delivery-flat, finding the real
+weak-signal cliff needs sub-floor attenuation (an inline RF attenuator or
+characterized shielding), not the PA setting.
 
 ## Manual receiver
 
