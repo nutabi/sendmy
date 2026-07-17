@@ -1,0 +1,27 @@
+{
+  "port": "/dev/cu.usbmodem101",
+  "settle_seconds": 900,
+  "report_floor_skew_s": 120,
+  "mid_gap": 100,
+  "deliver_window_s": null,
+  "detection": {
+    "poll": true,
+    "poll_interval_s": 60,
+    "detections_before_remove": 0,
+    "fast_timeout_s": 600,
+    "sweep_interval_s": 900,
+    "sweep_max_passes": 0,
+    "queue_soft_cap": 8
+  },
+  "density": {
+    "enabled": true,
+    "interval_s": 60,
+    "window_s": 10
+  },
+  "_note": "Static-soak delivery-persistence test (exercises the untested `static` mode + unbounded poll path). 3 fixed beacons, each a single non-rotating carrier held 110min (~5.5h transmit total, sequential). detections_before_remove=0 keeps each beacon in the fast queue for the whole run, so the poller logs every re-observation -> a delivery-continuity time-series (gap distribution over hours) per beacon. Slow tier off (sweep_max_passes=0): a static beacon, once seen, stays in the fast tier by design. Question: does a stationary unchanging beacon keep getting picked up, or go stale? Join re-observation gaps to density.csv.",
+  "cells": [
+    {"name": "soak0", "mode": "static", "adv_interval_ms": 1000, "duration_ms": 6600000, "payload_start": 1},
+    {"name": "soak1", "mode": "static", "adv_interval_ms": 1000, "duration_ms": 6600000, "payload_start": 2},
+    {"name": "soak2", "mode": "static", "adv_interval_ms": 1000, "duration_ms": 6600000, "payload_start": 3}
+  ]
+}
