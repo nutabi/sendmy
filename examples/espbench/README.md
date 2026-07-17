@@ -145,7 +145,7 @@ RAM on the device, so its carriers are fully independent of every other cell and
 of any earlier run: even identical `(mid, payload)` pairs derive different
 carriers under different UIDs, so nothing can collide on the shared relay. This is
 what lets you re-run the *same* matrix in different places without
-cross-contamination. Each cell's UID is saved to `results/<timestamp>/<cell>/uid.hex`
+cross-contamination. Each cell's UID is saved to `results/<run>/<cell>/uid.hex`
 (secret; `results/` is gitignored) so you can re-fetch that cell later. The mid
 ranges are still allocated disjointly as a second layer of safety and for
 readable logs.
@@ -262,7 +262,7 @@ Set `detections_before_remove: 0` (unbounded) with a large `lost_timeout_s` to
 keep a static key in the queue for the whole soak.
 
 **Offline analysis.** At the end of a run — and re-runnable any time with
-`analyze.py results/<timestamp> [--deliver-window-s N]` — the three series are
+`analyze.py results/<run> [--deliver-window-s N]` — the three series are
 joined into `summary.csv` / `summary.json` and each `<cell>/result.json` +
 `<cell>/timeseries.csv`. Those are *derived artifacts*; the CSV series are the
 ground truth. `deliver_window_s` is the query-time deliverability definition: a
@@ -270,7 +270,7 @@ window counts as delivered only if its expected payload was observed within that
 many seconds of its send time (unset = ever observed).
 
 **Ground-truth resweep.** For authoritative deliverability independent of the
-live poller, `resweep.py results/<timestamp>` re-fetches every transmitted key
+live poller, `resweep.py results/<run>` re-fetches every transmitted key
 straight from the relay (no queue cap, no adaptive timeout) and writes
 `cell,delivered,total`. It is re-runnable — a later sweep picks up
 slow-propagating weak-signal reports the first missed — and `--index LO-HI`
@@ -281,7 +281,11 @@ combines runs, with a later CSV overriding an earlier one per cell.
 
 ### Output
 
-Under `results/<timestamp>/` (at the espbench root):
+Each run writes to `results/<label>_<UTC-timestamp>/` (at the espbench root) —
+e.g. `results/txpower_rotation_20260717T143000Z/`. The label defaults to the
+matrix filename with the `matrix.`/`.json` stripped, or the matrix's own `label`
+field, or `--label NAME` on the command line; the timestamp keeps repeat runs of
+the same matrix grouped and distinct. Inside that directory:
 
 - `transmission.csv` / `detection.csv` — the two secret series (they carry `uid`
   and decrypted GPS), gitignored. `cells.json` — the run config plus each cell's
@@ -317,8 +321,9 @@ Under `results/<timestamp>/` (at the espbench root):
 Useful flags: `--no-flash` (capture a run already on the board), `--no-fetch`
 (capture only, skip the detection/analysis stage), `--no-poll` (single post-run
 sweep instead of the continuous poller), `--deliver-window-s N` (deliverability
-window for the offline analysis), `--dry-run`. Re-derive the metrics from an
-existing run's series with `analyze.py results/<timestamp> [--deliver-window-s N]`.
+window for the offline analysis), `--label NAME` (name the run directory),
+`--dry-run`. Re-derive the metrics from an existing run's series with
+`analyze.py results/<run> [--deliver-window-s N]`.
 
 ### Resilience (unattended runs)
 
@@ -482,7 +487,7 @@ project `uid.hex`, so to re-fetch a specific harness cell first copy that cell's
 saved UID into place:
 
 ```sh
-cp results/<timestamp>/<cell>/uid.hex uid.hex
+cp results/<run>/<cell>/uid.hex uid.hex
 scripts/.venv/bin/python scripts/fetch_reports.py --mid-base 0 --count 16
 ```
 

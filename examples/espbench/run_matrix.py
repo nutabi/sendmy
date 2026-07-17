@@ -634,6 +634,22 @@ def single_sweep(account, writer: SeriesWriter, tx_records: list[dict], *,
 # Main
 # --------------------------------------------------------------------------- #
 
+def derive_run_label(matrix_path: Path, matrix: dict, override: str | None) -> str:
+    """Human-readable slug that prefixes the run directory name.
+
+    Priority: an explicit --label, else the matrix's own "label" field, else the
+    matrix filename with the conventional ``matrix.`` prefix and ``.json`` suffix
+    stripped (so ``matrix.txpower_rotation.json`` -> ``txpower_rotation``). The
+    result is sanitised to a filesystem- and sort-friendly slug so it can sit in
+    a path next to the timestamp.
+    """
+    raw = (override or matrix.get("label") or matrix_path.stem).strip()
+    if raw.startswith("matrix."):
+        raw = raw[len("matrix."):]
+    slug = re.sub(r"[^0-9A-Za-z._-]+", "-", raw).strip("-._")
+    return slug or "run"
+
+
 def main() -> None:
     # `--test` runs the merged-in offline unit tests (no hardware/network) and
     # exits, so the matrix positional is not required for it.
@@ -645,6 +661,10 @@ def main() -> None:
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("matrix", type=Path, help="matrix JSON file")
     parser.add_argument("--port", help="serial port (overrides matrix 'port')")
+    parser.add_argument("--label", help="human-readable prefix for the run "
+                        "directory name (default: matrix 'label' field, else the "
+                        "matrix filename sans 'matrix.'/'.json'); the run dir is "
+                        "<label>_<UTC timestamp>")
     parser.add_argument("--baud", type=int, default=115200, help="serial baud (default 115200)")
     parser.add_argument("--no-flash", action="store_true",
                         help="skip build/flash; capture a run already flashed on the board")
@@ -693,7 +713,10 @@ def main() -> None:
     if not port:
         sys.exit("error: no serial port (pass --port or set 'port' in the matrix)")
 
-    run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    # Run directory name: a meaningful label + a UTC timestamp so runs of the
+    # same matrix stay grouped and mutually distinct (e.g. txpower_rotation_20260717T143000Z).
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    run_id = f"{derive_run_label(args.matrix, matrix, args.label)}_{timestamp}"
     results_dir = Path(matrix.get("results_dir", bc.PROJECT_ROOT / "results")) / run_id
     results_dir.mkdir(parents=True, exist_ok=True)
     print(f"results -> {results_dir}")

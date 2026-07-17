@@ -1,0 +1,28 @@
+{
+  "port": "/dev/cu.usbmodem101",
+  "settle_seconds": 900,
+  "report_floor_skew_s": 120,
+  "mid_start": 0,
+  "mid_gap": 100,
+  "detection": {
+    "poll": true,
+    "poll_interval_s": 20,
+    "detections_before_remove": 1,
+    "lost_timeout_s": 900,
+    "queue_soft_cap": 64
+  },
+  "density": {
+    "enabled": true,
+    "interval_s": 60,
+    "window_s": 10
+  },
+  "_note": "Per-message first-availability latency, ~5h wall. Six incremental cells mint a fresh key every 60s (adv 1s => ~60 broadcasts per key), so every key is one independent 'message'. detections_before_remove=1 drops each key the instant its first report lands, so first_fetched_at-send_time is one clean send->retrievable latency sample per key and the queue holds only still-in-flight keys (well under queue_soft_cap, so the adaptive timeout does not prematurely drop propagating keys). ~282 attempted keys => a real distribution + tail, not 8 correlated soaks. A key never observed within its window times out at lost_timeout_s=900 (a deliverability miss, not a latency sample). Timing: 6 x 2820s transmission (16920s) + up to 900s final drain + one-time flash ~= 5h. Latency comes from this live poller BY DESIGN; deliverability must still come from the offline resweep: analyze.py results/<run> --deliver-window-s 900. Tunables: shorten update_interval_ms for more (but lower-pickup) keys; raise it for higher per-key pickup.",
+  "cells": [
+    { "name": "stream_1", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 60000, "count": 47, "payload_start": 1 },
+    { "name": "stream_2", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 60000, "count": 47, "payload_start": 1 },
+    { "name": "stream_3", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 60000, "count": 47, "payload_start": 1 },
+    { "name": "stream_4", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 60000, "count": 47, "payload_start": 1 },
+    { "name": "stream_5", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 60000, "count": 47, "payload_start": 1 },
+    { "name": "stream_6", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 60000, "count": 47, "payload_start": 1 }
+  ]
+}
