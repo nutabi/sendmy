@@ -96,6 +96,18 @@ def detection_config(matrix: dict) -> dict:
         # <= 0 means unbounded (for a static-soak time-series). Propagation is
         # captured on the first detection regardless.
         "detections_before_remove": int(pick("detections_before_remove", 1)),
+        # FAST-tier patience: how long an unseen key stays in the fast queue
+        # before it is MOVED to the slow tier (not dropped). Short by design so
+        # the fast queue keeps measuring propagation on fresh keys. Falls back to
+        # the legacy lost_timeout_s when unset, so existing matrices are unchanged.
+        "fast_timeout_s": float(pick("fast_timeout_s", pick("lost_timeout_s", 300.0))),
+        # SLOW tier: swept every sweep_interval_s (>> poll_interval_s), up to
+        # sweep_max_passes times, to recover true-but-late deliveries without
+        # corrupting propagation. sweep_max_passes <= 0 disables the slow tier
+        # (keys are dropped at fast_timeout_s, the legacy behaviour). Deliverability
+        # ground truth still comes from the offline resweep (resweep.py).
+        "sweep_interval_s": float(pick("sweep_interval_s", 900.0)),
+        "sweep_max_passes": int(pick("sweep_max_passes", 4)),
         # Base patience for an *unseen* key before we stop spending fetches on it.
         # This is a polling-efficiency knob, NOT a deliverability verdict.
         "lost_timeout_s": float(pick("lost_timeout_s", 300.0)),
@@ -198,6 +210,9 @@ def cells_manifest(cells: list[dict], det_cfg: dict, skew_s: float,
         "poll_interval_s": det_cfg["poll_interval_s"],
         "detections_before_remove": det_cfg["detections_before_remove"],
         "lost_timeout_s": det_cfg["lost_timeout_s"],
+        "fast_timeout_s": det_cfg["fast_timeout_s"],
+        "sweep_interval_s": det_cfg["sweep_interval_s"],
+        "sweep_max_passes": det_cfg["sweep_max_passes"],
         "queue_soft_cap": det_cfg["queue_soft_cap"],
         "skew_s": skew_s,
         "deliver_window_s": deliver_window_s,
@@ -444,6 +459,12 @@ TRANSMISSION_FIELDS = ["cell", "uid", "mid", "payload", "send_time"]
 DETECTION_FIELDS = ["cell", "uid", "mid", "payload", "report_id", "obs_timestamp",
                     "first_fetched_at", "latitude", "longitude",
                     "horizontal_accuracy", "confidence", "status"]
+# Slow-tier deliverability series. Deliberately carries `swept_at` (when the slow
+# sweep looked), NOT `first_fetched_at`: a sweep runs long after a key went quiet,
+# so its timestamp is not a queryable-latency and must never be used as
+# propagation. detection.csv stays fast-tier-only and byte-compatible.
+DELIVERABILITY_FIELDS = ["cell", "uid", "mid", "payload", "report_id",
+                         "obs_timestamp", "swept_at"]
 
 
 # --------------------------------------------------------------------------- #
@@ -490,32 +511,72 @@ class QueueEntry:
         self.detections = 0
 
 
-class DetectionPoller(threading.Thread):
-    """The run's single detection producer.
+class SlowEntry:
+    """One still-unseen key handed down to the slow tier for a few sparse sweeps.
 
-    Maintains a queue of `QueueEntry` keys (each with its own uid). Every
+    Carries its own uid so it can be re-fetched, plus a pass counter (how many
+    sweeps have looked) and a delivered flag (set once a sweep finds a report).
+    """
+
+    __slots__ = ("cell", "uid", "mid", "payload", "send_time", "seen", "passes",
+                 "delivered")
+
+    def __init__(self, entry: QueueEntry) -> None:
+        self.cell = entry.cell
+        self.uid = entry.uid
+        self.mid = entry.mid
+        self.payload = entry.payload
+        self.send_time = entry.send_time
+        self.seen: set[str] = set()
+        self.passes = 0
+        self.delivered = False
+
+
+class DetectionPoller(threading.Thread):
+    """The run's single detection producer, driving two tiers on one thread.
+
+    FAST tier -- a queue of `QueueEntry` keys (each with its own uid). Every
     `interval_s` it fetches all queued keys, appends each newly-seen report to the
-    detection series (stamping `first_fetched_at` = now), and then drops keys that
-    have reached `detections_before_remove` or -- while still unseen -- the
-    adaptive lost-timeout. A key still delivering keeps its slot until its
-    detection budget is spent, so a static soak (unbounded budget) is polled for
-    the whole run.
+    detection series (stamping `first_fetched_at` = now, the propagation clock).
+    A key leaves the fast queue when it reaches `detections_before_remove`
+    (delivered) or, while still unseen, once it outlives the adaptive
+    `fast_timeout_s`. Instead of being dropped there, an unseen key is *moved* to
+    the slow tier (unless the slow tier is disabled, in which case it is dropped,
+    the legacy behaviour).
+
+    SLOW tier -- a list of `SlowEntry` keys swept every `sweep_interval_s`
+    (>> `interval_s`), up to `sweep_max_passes` times. A sweep that finds a report
+    records the key as DELIVERED in the *separate* deliverability series (stamping
+    `swept_at`, never `first_fetched_at`) and removes it; a key not found within
+    its passes is dropped (the authoritative offline resweep still catches
+    true-late deliveries). This lets the live view converge toward truth without
+    ever writing a slow, non-propagation timestamp into detection.csv.
+
+    Both tiers run on this one thread, so there is never concurrent account access.
     """
 
     def __init__(self, account, writer: SeriesWriter, *, interval_s: float,
                  detections_before_remove: int, lost_timeout_s: float,
-                 queue_soft_cap: int, skew_s: float, stop_event) -> None:
+                 queue_soft_cap: int, skew_s: float, stop_event,
+                 fast_timeout_s: float | None = None,
+                 sweep_interval_s: float = 900.0, sweep_max_passes: int = 0,
+                 deliver_writer: SeriesWriter | None = None) -> None:
         super().__init__(daemon=True)
         self._account = account
         self._writer = writer
+        self._deliver_writer = deliver_writer
         self._interval = max(1.0, interval_s)
         self._cap = detections_before_remove
-        self._timeout = lost_timeout_s
+        # Fast-tier unseen timeout; falls back to the legacy lost_timeout_s.
+        self._timeout = lost_timeout_s if fast_timeout_s is None else fast_timeout_s
         self._soft_cap = queue_soft_cap
         self._skew = skew_s
         self._stop = stop_event
+        self._sweep_interval = max(1.0, sweep_interval_s)
+        self._sweep_max_passes = sweep_max_passes
         self._lock = threading.Lock()
         self._queue: list[QueueEntry] = []
+        self._slow: list[SlowEntry] = []
 
     def enqueue(self, cell: str, uid: bytes, mid: int, payload: int,
                 send_time: float) -> None:
@@ -525,6 +586,10 @@ class DetectionPoller(threading.Thread):
     def queue_size(self) -> int:
         with self._lock:
             return len(self._queue)
+
+    def slow_size(self) -> int:
+        with self._lock:
+            return len(self._slow)
 
     def _fetch_entry(self, entry: QueueEntry) -> None:
         """Fetch one key and append any newly-seen reports to the detection series."""
@@ -569,9 +634,12 @@ class DetectionPoller(threading.Thread):
             entries = list(self._queue)
         for entry in entries:
             self._fetch_entry(entry)
-        # Drop finished keys. `detections_before_remove <= 0` means unbounded
-        # (a soak time-series). An unseen key is dropped once it outlives the
-        # (queue-adaptive) timeout -- efficiency only, never a verdict.
+        # Retire finished keys. `detections_before_remove <= 0` means unbounded
+        # (a soak time-series). An unseen key that outlives the (queue-adaptive)
+        # fast timeout is MOVED to the slow tier -- not dropped -- so a real but
+        # late delivery is still recovered by the sparse sweeps. With the slow
+        # tier disabled (`sweep_max_passes <= 0`) it is dropped, the legacy
+        # behaviour. Either way this is efficiency, never a verdict.
         with self._lock:
             eff = adaptive_timeout(self._timeout, len(self._queue), self._soft_cap)
             now = time.time()
@@ -580,14 +648,68 @@ class DetectionPoller(threading.Thread):
                 if self._cap > 0 and entry.detections >= self._cap:
                     continue
                 if entry.detections == 0 and now - entry.send_time > eff:
+                    if self._sweep_max_passes > 0:
+                        self._slow.append(SlowEntry(entry))
                     continue
                 keep.append(entry)
             self._queue = keep
 
+    def _sweep_entry(self, entry: SlowEntry) -> None:
+        """Fetch one slow-tier key; on any hit, record it DELIVERED (never as
+        propagation) in the deliverability series and mark the entry delivered."""
+        try:
+            reports = bc.fetch_reports_for_mid(
+                self._account, entry.uid, entry.mid,
+                since_epoch=entry.send_time, skew_s=self._skew)
+        except Exception as exc:  # noqa: BLE001 - a bad sweep must not kill the run
+            print(f"    sweep: {entry.cell} mid={entry.mid} fetch failed: {exc!r}",
+                  file=sys.stderr, flush=True)
+            return
+        entry.passes += 1
+        if not reports:
+            return
+        swept = time.time()
+        uid_hex = entry.uid.hex()
+        for payload, records in reports.items():
+            for rec in records:
+                rid = rec["id"]
+                if rid in entry.seen:
+                    continue
+                entry.seen.add(rid)
+                if self._deliver_writer is not None:
+                    self._deliver_writer.append({
+                        "cell": entry.cell,
+                        "uid": uid_hex,
+                        "mid": entry.mid,
+                        "payload": payload,
+                        "report_id": rid,
+                        "obs_timestamp": rec["timestamp"],
+                        # Deliberately NOT first_fetched_at -- see DELIVERABILITY_FIELDS.
+                        "swept_at": swept,
+                    })
+        entry.delivered = True
+
+    def sweep_slow_once(self) -> None:
+        """One pass over the slow tier: fetch each key, then drop the delivered
+        ones and any that have spent their `sweep_max_passes`."""
+        with self._lock:
+            entries = list(self._slow)
+        for entry in entries:
+            self._sweep_entry(entry)
+        with self._lock:
+            self._slow = [e for e in self._slow
+                          if not e.delivered and e.passes < self._sweep_max_passes]
+
     def run(self) -> None:
         # wait() returns True the moment we are asked to stop, ending the loop.
+        # The fast tier polls every interval; the slow tier is swept on its own,
+        # much coarser schedule -- all on this single thread (no concurrent access).
+        next_sweep = time.time() + self._sweep_interval
         while not self._stop.wait(self._interval):
             self.poll_once()
+            if self._sweep_max_passes > 0 and time.time() >= next_sweep:
+                self.sweep_slow_once()
+                next_sweep = time.time() + self._sweep_interval
 
 
 def single_sweep(account, writer: SeriesWriter, tx_records: list[dict], *,
@@ -704,10 +826,14 @@ def main() -> None:
             print(f"{c['name']}: mode={c['mode']} adv={c['adv_interval_ms']}ms "
                   f"mid_base={c['mid_base']} windows={len(c['expected'])}")
         poll = det_cfg["poll"] and not args.no_poll
+        slow = "on" if det_cfg["sweep_max_passes"] > 0 else "off"
         print(f"detection: poll={poll} interval={det_cfg['poll_interval_s']:.0f}s "
               f"detections_before_remove={det_cfg['detections_before_remove']} "
-              f"lost_timeout_s={det_cfg['lost_timeout_s']:.0f} "
               f"queue_soft_cap={det_cfg['queue_soft_cap']}")
+        print(f"  fast tier: fast_timeout_s={det_cfg['fast_timeout_s']:.0f} "
+              f"(unseen key moves to slow tier, or drops if slow off)")
+        print(f"  slow tier: {slow} -- sweep every {det_cfg['sweep_interval_s']:.0f}s "
+              f"x{det_cfg['sweep_max_passes']} passes -> deliverability.csv")
         return
 
     if not port:
@@ -752,6 +878,12 @@ def main() -> None:
     tx_writer = SeriesWriter(results_dir / "transmission.csv", TRANSMISSION_FIELDS)
     det_writer = (SeriesWriter(results_dir / "detection.csv", DETECTION_FIELDS)
                   if not args.no_fetch else None)
+    # Slow-tier deliverability series, only when the slow tier is actually enabled
+    # (poll on + sweep_max_passes > 0). Absent for old-style runs, which keeps the
+    # offline union backward-compatible.
+    deliver_writer = (
+        SeriesWriter(results_dir / "deliverability.csv", DELIVERABILITY_FIELDS)
+        if poll and det_cfg["sweep_max_passes"] > 0 else None)
     # In-memory transmission log, needed for the --no-poll single sweep.
     tx_records: list[dict] = []
     tx_lock = threading.Lock()
@@ -781,10 +913,16 @@ def main() -> None:
             detections_before_remove=det_cfg["detections_before_remove"],
             lost_timeout_s=det_cfg["lost_timeout_s"],
             queue_soft_cap=det_cfg["queue_soft_cap"], skew_s=skew_s,
-            stop_event=stop_event)
-        print(f"detection: polling every {det_cfg['poll_interval_s']:.0f}s "
+            stop_event=stop_event, fast_timeout_s=det_cfg["fast_timeout_s"],
+            sweep_interval_s=det_cfg["sweep_interval_s"],
+            sweep_max_passes=det_cfg["sweep_max_passes"],
+            deliver_writer=deliver_writer)
+        slow = (f"slow sweep every {det_cfg['sweep_interval_s']:.0f}s "
+                f"x{det_cfg['sweep_max_passes']} passes -> deliverability.csv"
+                if det_cfg["sweep_max_passes"] > 0 else "slow tier off")
+        print(f"detection: fast poll every {det_cfg['poll_interval_s']:.0f}s "
               f"(detections_before_remove={det_cfg['detections_before_remove']}, "
-              f"lost_timeout_s={det_cfg['lost_timeout_s']:.0f})", flush=True)
+              f"fast_timeout_s={det_cfg['fast_timeout_s']:.0f}); {slow}", flush=True)
         poller.start()
 
     def process_cell(cell: dict) -> None:
@@ -860,17 +998,22 @@ def main() -> None:
                     f"{type(exc).__name__}: {exc}\n")
                 continue
 
-        # Final drain: keep polling until the queue empties (every key hit its
-        # detection budget or timed out) or the drain cap elapses. The cap is at
-        # least `lost_timeout_s`, so the last cell's key gets the same patience as
-        # any other -- a short `settle_seconds` must not cut it off before its
-        # reports (and their propagation) can land. The loop still exits the moment
-        # the queue empties, so a generous cap costs nothing once everything is in.
+        # Final drain: keep the poller running until BOTH tiers empty (every key
+        # hit its detection budget, or timed out of the fast tier and then either
+        # delivered or spent its slow-tier passes) or the drain cap elapses. The
+        # cap gives the slow tier room to run its full schedule too, so the live
+        # view converges before the authoritative offline resweep. It is at least
+        # `settle_seconds`, so a short settle never cuts a key off before its
+        # reports (and their propagation) can land. The loop exits the moment both
+        # tiers empty, so a generous cap costs nothing once everything is in.
         if poller is not None:
-            drain_cap_s = max(settle_s, det_cfg["lost_timeout_s"])
+            drain_cap_s = max(settle_s, det_cfg["fast_timeout_s"]
+                              + det_cfg["sweep_interval_s"]
+                              * (det_cfg["sweep_max_passes"] + 1))
             print(f"\n=== draining poll queue (<= {drain_cap_s:.0f}s) ===", flush=True)
             deadline = time.time() + drain_cap_s
-            while time.time() < deadline and poller.queue_size() > 0:
+            while (time.time() < deadline
+                   and (poller.queue_size() > 0 or poller.slow_size() > 0)):
                 time.sleep(min(det_cfg["poll_interval_s"], max(0.0, deadline - time.time())))
             stop_event.set()
             poller.join(timeout=30)
@@ -888,6 +1031,8 @@ def main() -> None:
         tx_writer.close()
         if det_writer is not None:
             det_writer.close()
+        if deliver_writer is not None:
+            deliver_writer.close()
         if density_proc is not None:
             density_proc.terminate()
             try:
@@ -1016,13 +1161,14 @@ class RecordingWriter:
         pass
 
 
-def _make_poller(writer, reports, **kw):
+def _make_poller(writer, reports, deliver_writer=None, **kw):
     install_fake_fetch(reports)
     stop = threading.Event()
     cfg = dict(interval_s=1.0, detections_before_remove=1, lost_timeout_s=300.0,
                queue_soft_cap=8, skew_s=120.0, stop_event=stop)
     cfg.update(kw)
-    poller = DetectionPoller(FakeAccount(), writer, **cfg)
+    poller = DetectionPoller(FakeAccount(), writer, deliver_writer=deliver_writer,
+                             **cfg)
     return poller, stop
 
 
@@ -1221,6 +1367,256 @@ def test_analyze_never_seen_window_censored_from_latency():
                                skew_s=120.0, polled=True)
     assert res["windows"] == 2 and res["delivered"] == 1
     assert res["latency_n"] == 1  # the lost window is censored, not counted slow
+
+
+# --------------------------------------------------------------------------- #
+# Two-tier poller: fast -> slow hand-off, slow-tier deliverability
+# --------------------------------------------------------------------------- #
+
+def test_unseen_key_moves_fast_to_slow_not_dropped():
+    # With the slow tier enabled, an unseen key past fast_timeout_s is MOVED to
+    # the slow tier, not dropped -- and nothing is written to either series yet.
+    uid = bytes([0x77] * 32)
+    now = time.time()
+    det = RecordingWriter()
+    deliver = RecordingWriter()
+    poller, _ = _make_poller(det, {}, deliver_writer=deliver,
+                             fast_timeout_s=50, sweep_max_passes=4)
+    poller.enqueue("c", uid, 1, 0, now - 100)  # older than fast_timeout
+    poller.poll_once()
+    assert poller.queue_size() == 0        # left the fast queue
+    assert poller.slow_size() == 1         # handed to the slow tier, not dropped
+    assert det.rows == [] and deliver.rows == []
+
+
+def test_slow_tier_disabled_drops_unseen_key():
+    # sweep_max_passes == 0 disables the slow tier -> legacy drop behaviour.
+    uid = bytes([0x78] * 32)
+    now = time.time()
+    det = RecordingWriter()
+    poller, _ = _make_poller(det, {}, fast_timeout_s=50, sweep_max_passes=0)
+    poller.enqueue("c", uid, 1, 0, now - 100)
+    poller.poll_once()
+    assert poller.queue_size() == 0 and poller.slow_size() == 0
+
+
+def test_slow_sweep_hit_writes_deliverability_not_first_fetched_at():
+    # A slow sweep that finds a report records it in deliverability (with swept_at,
+    # NOT first_fetched_at) and NOT in the detection series; the key is removed.
+    uid = bytes([0x79] * 32)
+    now = time.time()
+    det = RecordingWriter()
+    deliver = RecordingWriter()
+    poller, _ = _make_poller(det, {}, deliver_writer=deliver,
+                             fast_timeout_s=50, sweep_max_passes=4)
+    poller.enqueue("c", uid, 5, 3, now - 100)
+    poller.poll_once()                     # unseen -> moved to slow tier
+    assert poller.slow_size() == 1
+    # A report becomes queryable; the next slow sweep should catch it.
+    install_fake_fetch({(uid.hex(), 5): {3: [_record("s1", now)]}})
+    poller.sweep_slow_once()
+    assert det.rows == []                  # detection.csv untouched -> propagation safe
+    assert poller.slow_size() == 0         # delivered -> removed from slow tier
+    assert len(deliver.rows) == 1
+    row = deliver.rows[0]
+    assert row["report_id"] == "s1" and row["mid"] == 5 and row["payload"] == 3
+    assert "swept_at" in row and "first_fetched_at" not in row
+
+
+def test_fast_delivery_writes_detection_with_first_fetched_at():
+    # A fast-tier delivery still writes detection.csv with a real first_fetched_at
+    # and never touches the deliverability series.
+    uid = bytes([0x7A] * 32)
+    now = time.time()
+    det = RecordingWriter()
+    deliver = RecordingWriter()
+    reports = {(uid.hex(), 8): {2: [_record("f1", now)]}}
+    poller, _ = _make_poller(det, reports, deliver_writer=deliver,
+                             fast_timeout_s=50, sweep_max_passes=4)
+    poller.enqueue("c", uid, 8, 2, now)
+    poller.poll_once()
+    assert deliver.rows == []
+    assert len(det.rows) == 1
+    assert det.rows[0]["report_id"] == "f1"
+    assert det.rows[0]["first_fetched_at"] >= now
+
+
+def test_unfound_slow_key_dropped_after_max_passes():
+    # A slow key never found is dropped once it has spent sweep_max_passes sweeps.
+    uid = bytes([0x7B] * 32)
+    now = time.time()
+    det = RecordingWriter()
+    deliver = RecordingWriter()
+    poller, _ = _make_poller(det, {}, deliver_writer=deliver,
+                             fast_timeout_s=50, sweep_max_passes=2)
+    poller.enqueue("c", uid, 1, 0, now - 100)
+    poller.poll_once()
+    assert poller.slow_size() == 1
+    poller.sweep_slow_once()               # pass 1: still not found -> kept
+    assert poller.slow_size() == 1
+    poller.sweep_slow_once()               # pass 2: spent budget -> dropped
+    assert poller.slow_size() == 0
+    assert deliver.rows == []
+
+
+def test_detection_config_backward_compatible_flat_keys():
+    # Old flat matrix (no detection block, only legacy keys): fast_timeout_s falls
+    # back to lost_timeout_s and the slow-tier defaults apply.
+    cfg = detection_config({"poll": True, "lost_timeout_s": 480.0,
+                            "poll_interval_s": 20.0})
+    assert cfg["poll"] is True
+    assert cfg["lost_timeout_s"] == 480.0
+    assert cfg["fast_timeout_s"] == 480.0          # fell back to lost_timeout_s
+    assert cfg["sweep_interval_s"] == 900.0
+    assert cfg["sweep_max_passes"] == 4
+    # A fresh matrix may set fast_timeout_s explicitly in the detection block.
+    cfg2 = detection_config({"detection": {"poll": True, "lost_timeout_s": 480.0,
+                                           "fast_timeout_s": 120.0,
+                                           "sweep_max_passes": 0}})
+    assert cfg2["fast_timeout_s"] == 120.0 and cfg2["sweep_max_passes"] == 0
+
+
+def test_analyze_deliverability_union_slow_tier():
+    # A window with NO fast-tier detection but a slow-tier deliverability hit
+    # counts as delivered (union) -- yet contributes no propagation/latency.
+    send = 5_000_000.0
+    cell = _cell(expected=[[10, 5]])
+    tx = [_tx_row("c", "aa", 10, 5, send)]
+    deliv = [{"cell": "c", "uid": "aa", "mid": 10, "payload": 5,
+              "report_id": "s1", "obs_timestamp": _iso(send + 400),
+              "swept_at": send + 900}]
+    res = analyze.analyze_cell(cell, tx, [], deliver_window_s=None,
+                               skew_s=120.0, polled=True, deliv_rows=deliv)
+    assert res["delivered"] == 1 and res["deliverability"] == 1.0
+    assert res["correct"] == 1
+    assert res["propagation_n"] == 0        # slow tier never feeds propagation
+    assert res["latency_n"] == 0            # nor discovery latency
+
+
+def test_analyze_deliverability_union_respects_window():
+    # The slow-tier hit is subject to the same deliver window as detections.
+    send = 6_000_000.0
+    cell = _cell(expected=[[10, 5]])
+    tx = [_tx_row("c", "aa", 10, 5, send)]
+    deliv = [{"cell": "c", "uid": "aa", "mid": 10, "payload": 5,
+              "report_id": "s1", "obs_timestamp": _iso(send + 500),
+              "swept_at": send + 900}]
+    res = analyze.analyze_cell(cell, tx, [], deliver_window_s=300.0,
+                               skew_s=120.0, polled=True, deliv_rows=deliv)
+    assert res["delivered"] == 0            # 500s late, outside a 300s window
+    res2 = analyze.analyze_cell(cell, tx, [], deliver_window_s=None,
+                                skew_s=120.0, polled=True, deliv_rows=deliv)
+    assert res2["delivered"] == 1           # open window accepts it
+
+
+# --- Additional adversarial tests (not from the original branch) ------------ #
+
+def test_backlog_moves_unseen_keys_to_slow_not_dropped():
+    # THE regression this refactor exists for: under backlog the adaptive timeout
+    # shrinks below the base fast_timeout_s, but with the slow tier enabled those
+    # aged-out unseen keys must be MOVED to the slow tier, never silently dropped
+    # (which is what caused the live-poller deliverability under-count).
+    uid = bytes([0x81] * 32)
+    now = time.time()
+    det = RecordingWriter()
+    deliver = RecordingWriter()
+    poller, _ = _make_poller(det, {}, deliver_writer=deliver,
+                             fast_timeout_s=300, queue_soft_cap=4,
+                             sweep_max_passes=4)
+    # 40 keys aged 100s: effective fast timeout = 300 * 4 / 40 = 30s < 100s.
+    for i in range(40):
+        poller.enqueue("c", uid, 100 + i, 0, now - 100)
+    poller.poll_once()
+    assert poller.queue_size() == 0        # all aged out of the fast queue
+    assert poller.slow_size() == 40        # ... and none were dropped
+    assert det.rows == [] and deliver.rows == []
+
+
+def test_fast_seen_key_never_enters_slow_tier_disjoint():
+    # A key delivered by the fast tier must never also enter the slow tier, so
+    # detection.csv and deliverability.csv stay disjoint per (cell, mid, payload)
+    # and the union can never double-count a delivery.
+    uid = bytes([0x82] * 32)
+    now = time.time()
+    det = RecordingWriter()
+    deliver = RecordingWriter()
+    reports = {(uid.hex(), 8): {2: [_record("f1", now)]}}
+    poller, _ = _make_poller(det, reports, deliver_writer=deliver,
+                             detections_before_remove=1, fast_timeout_s=1,
+                             sweep_max_passes=4)
+    poller.enqueue("c", uid, 8, 2, now)
+    poller.poll_once()                     # delivered fast, budget spent
+    assert poller.queue_size() == 0 and poller.slow_size() == 0
+    poller.sweep_slow_once()               # nothing to sweep
+    assert len(det.rows) == 1 and deliver.rows == []
+
+
+def test_slow_sweep_fetch_failure_does_not_consume_pass_or_crash():
+    # A slow sweep whose fetch raises must not crash the run, must not write a
+    # deliverability row, and must not consume one of the key's limited passes.
+    uid = bytes([0x83] * 32)
+    now = time.time()
+    det = RecordingWriter()
+    deliver = RecordingWriter()
+    poller, _ = _make_poller(det, {}, deliver_writer=deliver,
+                             fast_timeout_s=50, sweep_max_passes=2)
+    poller.enqueue("c", uid, 1, 0, now - 100)
+    poller.poll_once()
+    assert poller.slow_size() == 1
+
+    def boom(account, uid, mid, *, since_epoch=None, skew_s=0.0):
+        raise RuntimeError("relay unreachable")
+    original = bc.fetch_reports_for_mid
+    bc.fetch_reports_for_mid = boom
+    try:
+        poller.sweep_slow_once()           # must swallow the error
+        poller.sweep_slow_once()
+    finally:
+        bc.fetch_reports_for_mid = original
+    assert poller.slow_size() == 1         # still queued: no pass was consumed
+    assert deliver.rows == []
+    # Once the relay recovers and the report is queryable, it is recorded.
+    install_fake_fetch({(uid.hex(), 1): {0: [_record("s1", now)]}})
+    poller.sweep_slow_once()
+    assert poller.slow_size() == 0 and len(deliver.rows) == 1
+
+
+def test_slow_sweep_dedups_report_id_across_passes():
+    # The same report id seen on two consecutive sweeps writes only one row.
+    uid = bytes([0x84] * 32)
+    now = time.time()
+    det = RecordingWriter()
+    deliver = RecordingWriter()
+    poller, _ = _make_poller(det, {}, deliver_writer=deliver,
+                             fast_timeout_s=50, sweep_max_passes=4)
+    poller.enqueue("c", uid, 2, 1, now - 100)
+    poller.poll_once()
+    # First hit delivers and removes the key, so a second identical sweep is a
+    # no-op; but assert the per-entry dedup directly by re-seeding the same id.
+    install_fake_fetch({(uid.hex(), 2): {1: [_record("s1", now)]}})
+    poller.sweep_slow_once()
+    assert len(deliver.rows) == 1 and poller.slow_size() == 0
+    poller.sweep_slow_once()               # key already gone -> no new row
+    assert len(deliver.rows) == 1
+
+
+def test_analyze_union_does_not_double_count_when_in_both_series():
+    # Defensive: if a (mid, payload) somehow appears in BOTH detection and
+    # deliverability, it is delivered exactly once and propagation stays derived
+    # from the detection row only.
+    send = 7_000_000.0
+    cell = _cell(expected=[[10, 5]])
+    tx = [_tx_row("c", "aa", 10, 5, send)]
+    det = [_det_row("c", "aa", 10, 5, "r1", send + 60, send + 90)]  # propagation 30
+    deliv = [{"cell": "c", "uid": "aa", "mid": 10, "payload": 5,
+              "report_id": "s1", "obs_timestamp": _iso(send + 400),
+              "swept_at": send + 900}]
+    res = analyze.analyze_cell(cell, tx, det, deliver_window_s=None,
+                               skew_s=120.0, polled=True, deliv_rows=deliv)
+    assert res["windows"] == 1 and res["delivered"] == 1   # counted once
+    assert res["deliverability"] == 1.0
+    assert res["propagation_n"] == 1                        # from detection only
+    assert abs(res["propagation_min_s"] - 30.0) < 1e-6
 
 
 def _run_all() -> None:

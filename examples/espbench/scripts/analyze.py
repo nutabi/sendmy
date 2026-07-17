@@ -96,7 +96,7 @@ def _rec_from_row(row: dict) -> dict:
 
 def analyze_cell(cell: dict, tx_rows: list[dict], det_rows: list[dict], *,
                  deliver_window_s: float | None, skew_s: float,
-                 polled: bool) -> dict:
+                 polled: bool, deliv_rows: list[dict] | None = None) -> dict:
     """Derive one cell's statistics by joining its transmission + detection rows.
 
     `tx_rows` and `det_rows` are already filtered to this cell. The expected
@@ -104,6 +104,14 @@ def analyze_cell(cell: dict, tx_rows: list[dict], det_rows: list[dict], *,
     list; a detection counts toward a window only if its observation timestamp
     falls in the deliverability window `[send_time - skew, send_time + window]`
     (`deliver_window_s=None` leaves the upper bound open -- "ever delivered").
+
+    `deliv_rows` are the optional slow-tier deliverability rows (from
+    deliverability.csv). They contribute to DELIVERABILITY only -- a window is
+    delivered if its payload appears in detection.csv OR deliverability.csv
+    (union) -- and are NEVER used for propagation or discovery latency, which stay
+    detection-only. Absent (old runs) -> behaviour unchanged. The authoritative
+    deliverability ground truth is still the offline resweep (resweep.py); this
+    union just makes the live view converge closer to it.
     """
     expected = [(int(m), int(p)) for m, p in cell["expected"]]
     mode = cell["mode"]
@@ -118,6 +126,14 @@ def analyze_cell(cell: dict, tx_rows: list[dict], det_rows: list[dict], *,
     for r in det_rows:
         key = (int(r["mid"]), int(r["payload"]))
         by_key.setdefault(key, {})[r["report_id"]] = _rec_from_row(r)
+
+    # Slow-tier deliverability observations: (mid, payload) -> [obs_timestamp].
+    # These extend deliverability only, so we keep just the observation time
+    # needed to apply the deliverability window; no propagation is derived.
+    deliv_at: dict[tuple[int, int], list[str]] = {}
+    for r in (deliv_rows or []):
+        key = (int(r["mid"]), int(r["payload"]))
+        deliv_at.setdefault(key, []).append(r["obs_timestamp"])
 
     def records_for(mid: int, payload: int, send_time: float | None) -> list[dict]:
         """Chronological detections for a carrier, filtered to the deliver window."""
@@ -141,6 +157,22 @@ def analyze_cell(cell: dict, tx_rows: list[dict], det_rows: list[dict], *,
     report_counts: list[int] = []
     propagations: list[float] = []
 
+    def deliv_present(mid: int, payload: int, send_time: float | None) -> bool:
+        """Was this carrier seen by a slow-tier sweep, within the deliver window?"""
+        obs = deliv_at.get((mid, payload))
+        if not obs:
+            return False
+        if send_time is None:
+            return True
+        lo = send_time - skew_s
+        hi = None if deliver_window_s is None else send_time + deliver_window_s
+        for ts in obs:
+            t = datetime.fromisoformat(ts).timestamp()
+            if t < lo or (hi is not None and t > hi):
+                continue
+            return True
+        return False
+
     for mid, payload_exp in expected:
         floor = send_at.get(mid)
         # Every payload ever seen on this mid (collisions included), windowed.
@@ -153,7 +185,13 @@ def analyze_cell(cell: dict, tx_rows: list[dict], det_rows: list[dict], *,
                 if rec["propagation_latency_s"] is not None:
                     propagations.append(rec["propagation_latency_s"])
 
-        present = set(reports)
+        # Deliverability is the UNION of detection (fast tier) and deliverability
+        # (slow tier). Propagation / discovery / report volume stay detection-only:
+        # a window delivered *only* via the slow tier has no first_fetched_at and
+        # is (correctly) censored from those stats.
+        deliv_payloads = {p for (m, p) in deliv_at if m == mid
+                          and deliv_present(mid, p, floor)}
+        present = set(reports) | deliv_payloads
         is_delivered = bool(present)
         is_correct = payload_exp in present
         delivered += is_delivered
@@ -313,21 +351,27 @@ def analyze_run(results_dir: Path, *, deliver_window_s: float | None = None,
 
     tx_all = read_csv(results_dir / "transmission.csv")
     det_all = read_csv(results_dir / "detection.csv")
+    # Slow-tier deliverability series (absent for old runs -> empty -> unchanged).
+    deliv_all = read_csv(results_dir / "deliverability.csv")
     tx_by_cell: dict[str, list[dict]] = {}
     det_by_cell: dict[str, list[dict]] = {}
+    deliv_by_cell: dict[str, list[dict]] = {}
     for r in tx_all:
         tx_by_cell.setdefault(r["cell"], []).append(r)
     for r in det_all:
         det_by_cell.setdefault(r["cell"], []).append(r)
+    for r in deliv_all:
+        deliv_by_cell.setdefault(r["cell"], []).append(r)
 
     summary: list[dict] = []
     for cell in cells:
         name = cell["name"]
         tx_rows = tx_by_cell.get(name, [])
         det_rows = det_by_cell.get(name, [])
+        deliv_rows = deliv_by_cell.get(name, [])
         result = analyze_cell(cell, tx_rows, det_rows,
                               deliver_window_s=deliver_window_s,
-                              skew_s=skew_s, polled=polled)
+                              skew_s=skew_s, polled=polled, deliv_rows=deliv_rows)
         # Recover the cell's uid for the artifact (from the series or an override).
         uid = None
         if uid_by_cell and name in uid_by_cell:
@@ -336,6 +380,8 @@ def analyze_run(results_dir: Path, *, deliver_window_s: float | None = None,
             uid = tx_rows[0].get("uid")
         elif det_rows:
             uid = det_rows[0].get("uid")
+        elif deliv_rows:
+            uid = deliv_rows[0].get("uid")
         if uid is not None:
             result["uid"] = uid
 

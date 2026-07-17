@@ -177,7 +177,7 @@ Top-level keys:
 | Key | Default | Meaning |
 |-----|---------|---------|
 | `port` | — | serial port (or pass `--port`) |
-| `settle_seconds` | 120 | floor for the post-run poll-queue drain; the actual cap is `max(settle_seconds, lost_timeout_s)` so the last cell gets full patience |
+| `settle_seconds` | 120 | floor for the post-run poll-queue drain; the actual cap is `max(settle_seconds, fast_timeout_s + sweep_interval_s·(sweep_max_passes+1))` so both tiers get to finish |
 | `report_floor_skew_s` | 120 | clock-skew slack when rejecting reports older than a window's send time |
 | `mid_start` | 0 | first auto-assigned mid |
 | `mid_gap` | 100 | spare mids left between cells |
@@ -193,10 +193,13 @@ The **`detection`** block (with backward-compatible top-level fallbacks):
 | Key | Default | Meaning |
 |-----|---------|---------|
 | `poll` | false | run the continuous detection poller (`--no-poll` disables it) |
-| `poll_interval_s` | 30 | how often the poller fetches every queued key |
-| `detections_before_remove` | 1 | detections to log per key before dropping it from the queue (≤ 0 = unbounded, for a soak) |
-| `lost_timeout_s` | 300 | base patience for an *unseen* key before the poller stops fetching it |
-| `queue_soft_cap` | 8 | queue size under which the full timeout applies; above it the timeout shrinks to bound the fetch rate |
+| `poll_interval_s` | 30 | how often the **fast tier** fetches every queued key |
+| `detections_before_remove` | 1 | detections to log per key before dropping it from the fast queue (≤ 0 = unbounded, for a soak) |
+| `fast_timeout_s` | = `lost_timeout_s` | fast-tier patience: how long an *unseen* key stays in the fast queue before it is **moved to the slow tier** (falls back to `lost_timeout_s` when unset) |
+| `sweep_interval_s` | 900 | **slow tier** sweep cadence (≫ `poll_interval_s`) |
+| `sweep_max_passes` | 4 | slow-tier sweeps a key gets before it is dropped; **`0` disables the slow tier** (legacy single-tier behaviour) |
+| `lost_timeout_s` | 300 | legacy base patience; kept as the `fast_timeout_s` fallback so old matrices are unchanged |
+| `queue_soft_cap` | 8 | fast-queue size under which the full timeout applies; above it the timeout shrinks to bound the fetch rate |
 
 The **`density`** block (or set `density: false` to disable; flat `density_*`
 keys still work):
@@ -223,38 +226,69 @@ window, say) by `analyze.py` alone, without re-running or touching the servers.
 
 1. **Transmission** (`transmission.csv`) — one row per key put on air
    (`cell, uid, mid, payload, send_time`), straight off the serial `tx` line.
-2. **Detection** (`detection.csv`) — one row per (key, report) the poller ever
+2. **Detection** (`detection.csv`) — one row per (key, report) the **fast tier**
    sees (`cell, uid, mid, payload, report_id, obs_timestamp, first_fetched_at`,
    decrypted `latitude/longitude/horizontal_accuracy/confidence/status`), deduped
    by report id. `first_fetched_at` is the wall-clock of the *first* fetch that
    returned that id — that minus its observation timestamp is the propagation
    latency.
-3. **Density** (`density.csv`) — the nearby-finder time-series (see below).
+3. **Deliverability** (`deliverability.csv`) — one row per (key, report) the
+   **slow tier** recovers (`cell, uid, mid, payload, report_id, obs_timestamp,
+   swept_at`). Present only when the slow tier is enabled. `swept_at` is
+   deliberately **not** `first_fetched_at`: a sweep looks long after the key went
+   quiet, so its timestamp is not a queryable-latency and is never used as
+   propagation. This series extends *deliverability* only.
+4. **Density** (`density.csv`) — the nearby-finder time-series (see below).
 
-**The detection poller.** A single background poller runs for the whole run. Each
-key is enqueued the instant it starts transmitting (`on_tx`), carrying its own
-`uid`, and the poller fetches every queued key each `poll_interval_s`, appending
-new reports to the detection series. A key leaves the queue once it has logged
-`detections_before_remove` detections, or — while still unseen — once it outlives
-the `lost_timeout_s` patience. That timeout is **adaptive**: it holds full value
-while the queue fits `queue_soft_cap` and shrinks as the backlog grows, so the
-fetch rate on the single account stays bounded under low density. Crucially these
-are *polling-efficiency* knobs, **not** deliverability verdicts — deliverability
-is decided offline with whatever window you choose, so an aggressive timeout can
-never false-LOST a real-but-slow delivery; it only means fewer detection rows.
-Only the poller talks to the relay (serial capture does no network I/O), so there
-is never concurrent account access. `--no-poll` swaps the continuous poller for a
-single post-run sweep per key (deliverability is still complete; propagation is
-not meaningful).
+**The two-tier detection poller.** A single background poller runs for the whole
+run, driving two tiers on one thread (so there is never concurrent account
+access; only the poller talks to the relay). Each key is enqueued the instant it
+starts transmitting (`on_tx`), carrying its own `uid`.
 
-> **Note — the live detection counts are not deliverability.** `queue_soft_cap`
-> and the adaptive `lost_timeout_s` together drop still-unseen keys once the
-> queue is busy, so a report that becomes queryable after the (shrunken) timeout
-> is never fetched and the key looks lost when it was merely slow. This makes the
-> *live* detection statistics under-report — badly, under backlog — and even
-> introduces a spurious trend (denser cells suffer the largest queue and the
-> worst under-count). Always take deliverability from the offline analysis, not
-> the live counts (see [Experimental results](#experimental-results)).
+- **Fast tier** — fetches every queued key each `poll_interval_s` and appends new
+  reports to `detection.csv` (with `first_fetched_at`, the propagation clock).
+  This tier measures **propagation and discovery latency** on fresh keys. A key
+  leaves the fast queue when it logs `detections_before_remove` detections, or —
+  while still unseen — once it outlives the adaptive `fast_timeout_s` (full value
+  while the queue fits `queue_soft_cap`, shrinking as the backlog grows to bound
+  the fetch rate). Instead of being *dropped* there, an unseen key is **moved to
+  the slow tier**.
+- **Slow tier** — a separate list swept every `sweep_interval_s` (≫ the fast
+  interval), up to `sweep_max_passes` times. A sweep that finds a report records
+  the key as **delivered** in `deliverability.csv` (stamping `swept_at`, never
+  `first_fetched_at`) and drops it; a key never found within its passes is
+  dropped. This tier answers **deliverability** for slow, weak-signal keys the
+  fast tier timed out on — letting the live view converge toward truth without
+  ever writing a slow, non-propagation timestamp into `detection.csv`. Set
+  `sweep_max_passes: 0` to disable it (keys are dropped at `fast_timeout_s`, the
+  legacy single-tier behaviour).
+
+The rule: **deliverability = detection ∪ deliverability** (fast ∪ slow);
+**propagation and discovery latency = detection only**. A window delivered *only*
+via the slow tier is (correctly) censored from the timing stats. `--no-poll`
+swaps the continuous poller for a single post-run sweep per key (deliverability
+is still complete; propagation is not meaningful).
+
+To exercise both tiers on hardware, run the smoke matrix (~15–20 min; it uses a
+short `sweep_interval_s` so the slow tier engages within the run):
+
+```sh
+scripts/.venv/bin/python run_matrix.py matrix.twotier_smoke.json --port /dev/tty.usbmodemXXXX
+```
+
+Confirm afterwards that `detection.csv` carries `first_fetched_at` (propagation),
+`deliverability.csv` carries `swept_at` (never `first_fetched_at`), and
+`analyze.py` reports deliverability as the union of the two.
+
+> **Note — even the two-tier live counts are not the authoritative
+> deliverability.** The slow tier makes the live view converge much closer to
+> truth, but it is *bounded* (`sweep_max_passes` × `sweep_interval_s`), so a
+> report that only becomes queryable hours later — the weak-signal propagation
+> tail — is still missed live. For the authoritative figure, take deliverability
+> from the offline **resweep** (below), which has no cap and can be re-run for
+> days. Fast-tier `detection.csv` counts *alone* under-report badly under backlog
+> and must never be read as deliverability (see
+> [Experimental results](#experimental-results)).
 
 Apple caps a single fetch at **~8 most-recent reports per key**, so a soak's true
 multi-hour history is only obtainable by polling over time and unioning by id.
@@ -287,8 +321,10 @@ matrix filename with the `matrix.`/`.json` stripped, or the matrix's own `label`
 field, or `--label NAME` on the command line; the timestamp keeps repeat runs of
 the same matrix grouped and distinct. Inside that directory:
 
-- `transmission.csv` / `detection.csv` — the two secret series (they carry `uid`
-  and decrypted GPS), gitignored. `cells.json` — the run config plus each cell's
+- `transmission.csv` / `detection.csv` / `deliverability.csv` — the secret series
+  (they carry `uid` and decrypted GPS), gitignored. `detection.csv` is the fast
+  tier (propagation), `deliverability.csv` the slow tier (present only when the
+  slow tier is enabled). `cells.json` — the run config plus each cell's
   config-derived expected sequence, which `analyze.py` joins against.
 - `summary.csv` / `summary.json` — one row per cell with
   `deliverability`, `correctness`, `bytes_sent`, `bytes_delivered`,
@@ -339,9 +375,13 @@ matrix order regardless of which cells came through the retry pass.
 For a cell of `N` windows (1 octet each):
 
 - **deliverability** = windows with a relay report within `deliver_window_s` of
-  their send time / `N` (unset window = ever observed). Because this is a
-  query-time definition over the detection series, it can be re-derived with a
-  different window by re-running `analyze.py` — no re-run of the experiment.
+  their send time / `N` (unset window = ever observed), where a window counts if
+  it appears in `detection.csv` **or** `deliverability.csv` (fast ∪ slow tier).
+  Because this is a query-time definition over the series, it can be re-derived
+  with a different window by re-running `analyze.py` — no re-run of the
+  experiment. This live figure converges toward, but the **authoritative**
+  deliverability remains the offline `resweep.py` (no cap, re-runnable for the
+  full propagation tail).
 - **correctness** = windows whose recovered byte equals the expected byte / `N`.
 - **offered throughput** = `N` bytes / send-duration.
 - **delivered throughput** = delivered bytes / send-duration.

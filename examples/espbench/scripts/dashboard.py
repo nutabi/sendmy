@@ -51,17 +51,21 @@ def axes(cell: str) -> tuple[str, str]:
 def load(run: Path):
     sent = defaultdict(int)                 # cell -> keys sent
     seen = defaultdict(set)                  # cell -> {mid delivered}
-    tx_path, det_path = run / "transmission.csv", run / "detection.csv"
+    tx_path = run / "transmission.csv"
     last_cell = None
     if tx_path.exists():
         with tx_path.open() as f:
             for r in csv.DictReader(f):
                 sent[r["cell"]] += 1
                 last_cell = r["cell"]
-    if det_path.exists():
-        with det_path.open() as f:
-            for r in csv.DictReader(f):
-                seen[r["cell"]].add(r["mid"])
+    # Delivered = (cell, mid) in detection.csv OR deliverability.csv (fast + slow
+    # tier union). Either file may be absent (old runs, or slow tier disabled).
+    for name in ("detection.csv", "deliverability.csv"):
+        path = run / name
+        if path.exists():
+            with path.open() as f:
+                for r in csv.DictReader(f):
+                    seen[r["cell"]].add(r["mid"])
     return sent, seen, last_cell
 
 
