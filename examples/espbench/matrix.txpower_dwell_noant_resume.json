@@ -1,0 +1,368 @@
+{
+  "port": "/dev/cu.usbmodem101",
+  "settle_seconds": 900,
+  "report_floor_skew_s": 120,
+  "mid_gap": 100,
+  "deliver_window_s": null,
+  "detection": {
+    "poll": true,
+    "poll_interval_s": 30,
+    "detections_before_remove": 1,
+    "fast_timeout_s": 600,
+    "sweep_interval_s": 900,
+    "sweep_max_passes": 4,
+    "queue_soft_cap": 256
+  },
+  "density": {
+    "enabled": true,
+    "interval_s": 30,
+    "window_s": 10
+  },
+  "_note": "RESUME of matrix.txpower_dwell_noant.json. The 2026-08-07T09:00Z run lost the board off USB (Errno 6, Device not configured) partway through s050_pp09_d04 and every subsequent cell failed. This matrix is cells 55..97 of the parent, unchanged, so the two run directories concatenate into one 98-cell matrix. MERGE CAVEAT: s050_pp09_d04 transmitted partially in the parent run before the board dropped -- DROP the parent's s050 rows and keep this run's. All other cell names are disjoint between the two directories. Condition balance of this remainder: 13 cells per TX level per dwell pair, 3 anchors -- still interleaved in the parent's 6-cell block order, so pooling the halves is valid.",
+  "cells": [
+    {
+      "name": "s050_pp09_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s051_pn24_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s052_pp09_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s053_pn24_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s054_pp09_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s055_pn24_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s056_pp09_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s057_pn24_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s058_pp09_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s059_pn24_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "a005_ref",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s060_pp09_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s061_pn24_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s062_pp09_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s063_pn24_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s064_pp09_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s065_pn24_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s066_pp09_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s067_pn24_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s068_pp09_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s069_pn24_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s070_pp09_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s071_pn24_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "a006_ref",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s072_pp09_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s073_pn24_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s074_pp09_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s075_pn24_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s076_pp09_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s077_pn24_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s078_pp09_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s079_pn24_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s080_pp09_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s081_pn24_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s082_pp09_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s083_pn24_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "a007_ref",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s084_pp09_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s085_pn24_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s086_pp09_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s087_pn24_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s088_pp09_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s089_pn24_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    }
+  ]
+}
