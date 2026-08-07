@@ -278,6 +278,60 @@ the run: same power and dwell, 8 broadcasts → 99.4%, 5 broadcasts → 97.3%.
   which is expected since the slow sweep does what the resweep does. That
   validation still belongs to night 3.
 
+### Run 1b — TX × dwell, antenna removed (2026-08-07)
+
+`results/txpower_dwell_noant_20260807T090000Z` **plus**
+`results/txpower_dwell_noant_resume_20260807T103835Z`. The board dropped off USB
+(`Errno 6, Device not configured`) partway through `s050_pp09_d04`; the remaining
+43 cells ran from `matrix.txpower_dwell_noant_resume.json` after a replug. Pool
+the two directories and **drop the parent's partial `s050_pp09_d04`** — that
+gives the full 98 cells / 1960 keys. Offline resweep.
+
+| | dwell 2 s | 4 s | 8 s | row |
+|---|---|---|---|---|
+| **+9 dBm** | 50.0% | 52.3% | 47.0% | **49.8%** |
+| **−24 dBm** | 0.0% | 0.0% | 0.0% | **0.0%** (0/900) |
+
+Anchors 105/160 = **65.6%**, against 99.4% fitted.
+
+**Antenna-off is not an attenuator, it is two different regimes.** At −24 dBm it
+is a hard floor — 0 of 900 keys, not one report. At +9 dBm the link survives at
+half rate. So the antenna is worth ~46 points at full power and ≥89 points at
+−24 dBm; there is no setting at which it behaves like a modest, gradable loss.
+
+**Dwell is flat again** — 50.0/52.3/47.0 within +9 dBm, p = 0.58 (cell-clustered
+permutation, 20 000 shuffles), now at *half* delivery where 50 points of headroom
+exist. This is the second independent replication that dwell does nothing once
+broadcasts-per-key is held constant, and the strongest one, because a ceiling
+cannot explain it.
+
+**The anchors replicate the broadcast-count effect too** — 8 broadcasts/key gives
+65.6% against the standard axis's 49.8% at identical power and dwell, a 16-point
+gap in the same direction as run 1's 2-point gap, and much larger away from the
+ceiling.
+
+**Changes this forces:**
+
+- **Night 2's reversed-order repeat is no longer worth running as designed.** It
+  existed to separate the antenna effect from time-of-night; with a 0/900 arm and
+  BLE density matched across the two nights (mean finders 10.0 vs 11.1), there is
+  no plausible diurnal confound of that size. Prefer spending the slot on the
+  broadcasts × power matrix.
+- **Night 5 runs at −24 dBm with the antenna FITTED.** Antenna-off at −24 dBm is
+  a dead link and antenna-off at +9 dBm sits at 50%, which is usable but couples
+  the attenuation to a physical step that cannot be interleaved. Add
+  `tx_power_dbm: -24` to `matrix.dwell_low.json`; the decision gate is closed.
+- **The live poller undercounted by 2× again** — it read ~25% for the +9 dBm arm
+  where the resweep says 49.8%. The parent run's poller was killed mid-drain,
+  which explains part of it, but this is the same failure mode as before. The
+  standing rule holds without exception: deliverability comes from `resweep.py`.
+- **Physical handling of the board is a run hazard.** Run 1 ran 2 h 43 min
+  untouched; run 1b lost USB 1 h 10 min after the antenna was handled. Any run
+  requiring a physical change should re-seat and verify the connector before
+  starting, and the health monitor must watch for `Device not configured` — the
+  first monitor had no pattern for it and missed the real failure while firing a
+  false one.
+
 ## Retained from the earlier corpus
 
 `matrix.advertising.json`, `matrix.dwell_isobroadcast.json` and
