@@ -518,6 +518,93 @@ and note that because even the −24 dBm floor is delivery-flat, finding the rea
 weak-signal cliff needs sub-floor attenuation (an inline RF attenuator or
 characterized shielding), not the PA setting.
 
+### Advertising-interval sweep — duty cycle is nearly free
+
+**Parameters.** 120 `incremental` cells (`matrix.advertising.json`,
+`results/advertising_20260717T163332Z`), 20 windows each, over six advertising
+intervals — **100/250/500/1000/2000/4000 ms** — at a **fixed 8 s dwell**, so a
+window is held the same wall time regardless of how often it is broadcast and the
+only thing that varies is the number of broadcasts per key (80 down to 2). 20
+cells per level, interleaved in 6-cell blocks so diurnal drift is balanced across
+conditions. ~5.4 h of transmit, 2400 keys. Two-tier detection poller: fast tier
+every 30 s with 300 s patience, slow sweep every 900 s for up to 4 passes, queue
+soft-cap 16. Deliverability is the offline ground-truth resweep (`resweep.py`).
+
+**Goal.** The battery knob. Advertising is the dominant power draw, so how much
+deliverability (and discovery latency) does a lower radio duty cycle cost?
+
+**Statistics.** Finders were present throughout (12–28, median 17 over 379
+samples). Propagation (send → first queryable) over the 1572 keys the live poller
+timed: min 10 s, **median 91 s, p90 185 s**, max 330 s.
+
+| adv (ms) | 100 | 250 | 500 | 1000 | 2000 | 4000 | **all** |
+|----------|------|------|------|------|------|------|---------|
+| broadcasts/key | 80 | 32 | 16 | 8 | 4 | 2 | — |
+| delivered /400 | 400 | 400 | 400 | 400 | 399 | 396 | 2395/2400 |
+| **deliverability** | **100%** | **100%** | **100%** | **100%** | **99.8%** | **99.0%** | **99.8%** |
+
+Per-level propagation medians were 73–109 s with p90 152–214 s — no ordering with
+`adv_ms`. The worst single cell at any level delivered 19/20.
+
+**Result.** **Duty cycle is nearly free over the whole 100–4000 ms range.** A 40×
+reduction in broadcasts per key (80 → 2) costs about one point of deliverability,
+and discovery latency does not degrade with it either — even two broadcasts in an
+8 s window are enough for a finder in this density to catch the key, so the extra
+78 broadcasts at 100 ms buy nothing. Combined with the previous run, the picture
+is that **dwell (how long a key is on air), not broadcast rate (how often it
+repeats), is what delivery depends on**: spend the power budget on rotation
+interval and run the radio as slowly as the protocol allows. The knee is not
+inside this sweep — at 4000 ms the curve has only just begun to bend, so locating
+it needs a sweep out to the 10240 ms protocol maximum. Secondary result: the
+two-tier poller's *live* numbers (100/100/100/100/99.8/98.8%) matched the offline
+resweep to within one key, so the queue-pressure under-count that invalidated the
+first run's live figures is fixed.
+
+### Static soak — a fixed beacon does not go stale
+
+**Parameters.** 3 `static` cells (`matrix.soak.json`,
+`results/soak_20260717T225445Z`), each a single non-rotating carrier held for
+**110 min** at a 1 s advertising interval, run sequentially (~5.5 h total,
+overnight). The poller was configured with `detections_before_remove = 0`, so
+each beacon stays in the fast queue for the whole run and *every* re-observation
+is logged rather than just the first — the run's output is a delivery-continuity
+time-series, not a single deliverability number. Slow tier off.
+
+**Goal.** Does an unchanging carrier keep being picked up for hours, or does the
+network stop reporting it — through caching, de-duplication, or finders ignoring
+a beacon they have already seen? This is also the only exercise of the `static`
+mode and the unbounded poll path.
+
+**Statistics.** All three beacons delivered, and kept delivering for their entire
+transmit window.
+
+| beacon | unique reports | first seen after send | observation span | median gap | p90 gap | max gap |
+|--------|----------------|-----------------------|------------------|-----------|---------|---------|
+| soak0 | 214 | 34 s | 110 min | 0.42 min | 1.7 min | 3.5 min |
+| soak1 | 178 | 4 s | 113 min | 0.33 min | 2.3 min | 4.7 min |
+| soak2 | 181 | 74 s | 128 min | 0.50 min | 1.8 min | 4.0 min |
+
+Across all 442 inter-observation gaps: median 0.50 min, p90 2.0 min, max 4.7 min,
+and **not one gap exceeded 5 min**. Median horizontal accuracy of the decrypted
+fixes was 64–74 m. Ambient density fell from ~18 finders to ~8 over the night,
+while the report rate held at roughly 40–70 per 30 min with no matching decline.
+(soak2's span exceeds its 110 min hold because it was the last cell: after `done`
+the final carrier keeps advertising until the next `run` command — see
+[Notes](#notes).)
+
+**Result.** **A stationary unchanging beacon is picked up continuously and does
+not go stale.** Reports arrive roughly every 30 s for hours with no decay, no
+de-duplication, and no observed refractory behaviour, so the relay treats each
+observation of an already-seen carrier as a fresh report. Two practical
+consequences: a `static` carrier is a reliable presence/liveness channel with a
+worst-case observation gap of ~5 min at this density, and because ~200 reports
+accumulate per key over two hours, a receiver polling a static beacon should
+expect to page through a large report set rather than a handful. The report rate
+also held steady while finder density more than halved, which suggests delivery
+saturates well below the density seen here — but that is a two-point observation
+from one night, and the density matrix (`matrix.density.json`) is the run that
+would actually test it.
+
 ## Manual receiver
 
 `scripts/fetch_reports.py` recovers a mid range by hand, independent of the
