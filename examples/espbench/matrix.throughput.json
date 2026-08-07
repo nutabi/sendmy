@@ -1,6 +1,6 @@
 {
   "port": "/dev/cu.usbmodem101",
-  "settle_seconds": 600,
+  "settle_seconds": 900,
   "report_floor_skew_s": 120,
   "mid_gap": 100,
   "deliver_window_s": null,
@@ -8,113 +8,753 @@
     "poll": true,
     "poll_interval_s": 30,
     "detections_before_remove": 1,
-    "fast_timeout_s": 300,
+    "fast_timeout_s": 600,
     "sweep_interval_s": 900,
     "sweep_max_passes": 4,
-    "queue_soft_cap": 16
+    "queue_soft_cap": 256
   },
   "density": {
     "enabled": true,
-    "interval_s": 60,
+    "interval_s": 30,
     "window_s": 10
   },
-  "_note": "Update-interval (rotation dwell) throughput sweep. 4 dwell levels u06/u10/u14/u18 = 6/10/14/18s per mid, adv 1s, 20 windows/cell, 24 cells/level interleaved (each 4-cell block cycles all levels so diurnal drift is balanced across conditions). n=24 cells/level (480 keys/level) -> strong cell-clustered inference. ~6.4h transmit. Deliverability = detection UNION deliverability (two-tier); authoritative ground truth from resweep.py. analyze.py results/<run>.",
+  "_note": "RUN 1 of the series -- REPLICATION of the project's first experiment with the matured instrument. The DESIGN is deliberately unchanged from that run (4 dwell levels u06/u10/u14/u18 = 6/10/14/18s per mid, adv 1s, 20 windows/cell, interleaved): the point is to re-ask the original question with the fixed two-tier poller and the offline resweep, not to improve the design. The one deviation is replication count -- 24 cells/level here against the original's 30 -- traded for wall time; 480 keys/level is far more than the endpoint needs. The original reported 40.0% live vs 99.5% offline and a false 'longer dwell delivers better' trend that was queue-pressure artifact; if the instrument is sound this returns flat at ~99.5% with live and offline agreeing to within a key or two. That agreement is the run's actual deliverable and the precondition for trusting runs 2-4. ~6.9h transmit. NOTE dwell and broadcasts-per-key co-vary here (fixed adv) -- inherited from the original design, which is why this run replicates rather than discriminates. Ground truth: resweep.py. ANCHOR CELLS: cells named a###_ref are the series' shared reference condition (incremental, adv 1s, 8s dwell, 20 windows, +9 dBm) -- the same cell the density matrix repeats 120 times. One opens every run and one follows every few blocks, ~10% of the run. They are not part of this matrix's design; they exist so any two nights can be compared against a condition they actually share, and so a night whose ambient density was unusual announces itself instead of silently biasing the comparison. Analyse them across runs first, then read the run's own contrast.",
   "cells": [
-    {"name": "s000_u06", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 6000, "count": 20},
-    {"name": "s001_u10", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 10000, "count": 20},
-    {"name": "s002_u14", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 14000, "count": 20},
-    {"name": "s003_u18", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 18000, "count": 20},
-    {"name": "s004_u06", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 6000, "count": 20},
-    {"name": "s005_u10", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 10000, "count": 20},
-    {"name": "s006_u14", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 14000, "count": 20},
-    {"name": "s007_u18", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 18000, "count": 20},
-    {"name": "s008_u06", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 6000, "count": 20},
-    {"name": "s009_u10", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 10000, "count": 20},
-    {"name": "s010_u14", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 14000, "count": 20},
-    {"name": "s011_u18", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 18000, "count": 20},
-    {"name": "s012_u06", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 6000, "count": 20},
-    {"name": "s013_u10", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 10000, "count": 20},
-    {"name": "s014_u14", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 14000, "count": 20},
-    {"name": "s015_u18", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 18000, "count": 20},
-    {"name": "s016_u06", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 6000, "count": 20},
-    {"name": "s017_u10", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 10000, "count": 20},
-    {"name": "s018_u14", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 14000, "count": 20},
-    {"name": "s019_u18", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 18000, "count": 20},
-    {"name": "s020_u06", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 6000, "count": 20},
-    {"name": "s021_u10", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 10000, "count": 20},
-    {"name": "s022_u14", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 14000, "count": 20},
-    {"name": "s023_u18", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 18000, "count": 20},
-    {"name": "s024_u06", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 6000, "count": 20},
-    {"name": "s025_u10", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 10000, "count": 20},
-    {"name": "s026_u14", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 14000, "count": 20},
-    {"name": "s027_u18", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 18000, "count": 20},
-    {"name": "s028_u06", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 6000, "count": 20},
-    {"name": "s029_u10", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 10000, "count": 20},
-    {"name": "s030_u14", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 14000, "count": 20},
-    {"name": "s031_u18", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 18000, "count": 20},
-    {"name": "s032_u06", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 6000, "count": 20},
-    {"name": "s033_u10", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 10000, "count": 20},
-    {"name": "s034_u14", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 14000, "count": 20},
-    {"name": "s035_u18", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 18000, "count": 20},
-    {"name": "s036_u06", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 6000, "count": 20},
-    {"name": "s037_u10", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 10000, "count": 20},
-    {"name": "s038_u14", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 14000, "count": 20},
-    {"name": "s039_u18", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 18000, "count": 20},
-    {"name": "s040_u06", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 6000, "count": 20},
-    {"name": "s041_u10", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 10000, "count": 20},
-    {"name": "s042_u14", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 14000, "count": 20},
-    {"name": "s043_u18", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 18000, "count": 20},
-    {"name": "s044_u06", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 6000, "count": 20},
-    {"name": "s045_u10", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 10000, "count": 20},
-    {"name": "s046_u14", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 14000, "count": 20},
-    {"name": "s047_u18", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 18000, "count": 20},
-    {"name": "s048_u06", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 6000, "count": 20},
-    {"name": "s049_u10", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 10000, "count": 20},
-    {"name": "s050_u14", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 14000, "count": 20},
-    {"name": "s051_u18", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 18000, "count": 20},
-    {"name": "s052_u06", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 6000, "count": 20},
-    {"name": "s053_u10", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 10000, "count": 20},
-    {"name": "s054_u14", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 14000, "count": 20},
-    {"name": "s055_u18", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 18000, "count": 20},
-    {"name": "s056_u06", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 6000, "count": 20},
-    {"name": "s057_u10", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 10000, "count": 20},
-    {"name": "s058_u14", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 14000, "count": 20},
-    {"name": "s059_u18", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 18000, "count": 20},
-    {"name": "s060_u06", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 6000, "count": 20},
-    {"name": "s061_u10", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 10000, "count": 20},
-    {"name": "s062_u14", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 14000, "count": 20},
-    {"name": "s063_u18", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 18000, "count": 20},
-    {"name": "s064_u06", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 6000, "count": 20},
-    {"name": "s065_u10", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 10000, "count": 20},
-    {"name": "s066_u14", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 14000, "count": 20},
-    {"name": "s067_u18", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 18000, "count": 20},
-    {"name": "s068_u06", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 6000, "count": 20},
-    {"name": "s069_u10", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 10000, "count": 20},
-    {"name": "s070_u14", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 14000, "count": 20},
-    {"name": "s071_u18", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 18000, "count": 20},
-    {"name": "s072_u06", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 6000, "count": 20},
-    {"name": "s073_u10", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 10000, "count": 20},
-    {"name": "s074_u14", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 14000, "count": 20},
-    {"name": "s075_u18", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 18000, "count": 20},
-    {"name": "s076_u06", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 6000, "count": 20},
-    {"name": "s077_u10", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 10000, "count": 20},
-    {"name": "s078_u14", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 14000, "count": 20},
-    {"name": "s079_u18", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 18000, "count": 20},
-    {"name": "s080_u06", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 6000, "count": 20},
-    {"name": "s081_u10", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 10000, "count": 20},
-    {"name": "s082_u14", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 14000, "count": 20},
-    {"name": "s083_u18", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 18000, "count": 20},
-    {"name": "s084_u06", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 6000, "count": 20},
-    {"name": "s085_u10", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 10000, "count": 20},
-    {"name": "s086_u14", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 14000, "count": 20},
-    {"name": "s087_u18", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 18000, "count": 20},
-    {"name": "s088_u06", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 6000, "count": 20},
-    {"name": "s089_u10", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 10000, "count": 20},
-    {"name": "s090_u14", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 14000, "count": 20},
-    {"name": "s091_u18", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 18000, "count": 20},
-    {"name": "s092_u06", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 6000, "count": 20},
-    {"name": "s093_u10", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 10000, "count": 20},
-    {"name": "s094_u14", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 14000, "count": 20},
-    {"name": "s095_u18", "mode": "incremental", "adv_interval_ms": 1000, "update_interval_ms": 18000, "count": 20}
+    {
+      "name": "a000_ref",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s000_u06",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 6000,
+      "count": 20
+    },
+    {
+      "name": "s001_u10",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 10000,
+      "count": 20
+    },
+    {
+      "name": "s002_u14",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 14000,
+      "count": 20
+    },
+    {
+      "name": "s003_u18",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 18000,
+      "count": 20
+    },
+    {
+      "name": "s004_u06",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 6000,
+      "count": 20
+    },
+    {
+      "name": "s005_u10",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 10000,
+      "count": 20
+    },
+    {
+      "name": "s006_u14",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 14000,
+      "count": 20
+    },
+    {
+      "name": "s007_u18",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 18000,
+      "count": 20
+    },
+    {
+      "name": "s008_u06",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 6000,
+      "count": 20
+    },
+    {
+      "name": "s009_u10",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 10000,
+      "count": 20
+    },
+    {
+      "name": "s010_u14",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 14000,
+      "count": 20
+    },
+    {
+      "name": "s011_u18",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 18000,
+      "count": 20
+    },
+    {
+      "name": "a001_ref",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s012_u06",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 6000,
+      "count": 20
+    },
+    {
+      "name": "s013_u10",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 10000,
+      "count": 20
+    },
+    {
+      "name": "s014_u14",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 14000,
+      "count": 20
+    },
+    {
+      "name": "s015_u18",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 18000,
+      "count": 20
+    },
+    {
+      "name": "s016_u06",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 6000,
+      "count": 20
+    },
+    {
+      "name": "s017_u10",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 10000,
+      "count": 20
+    },
+    {
+      "name": "s018_u14",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 14000,
+      "count": 20
+    },
+    {
+      "name": "s019_u18",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 18000,
+      "count": 20
+    },
+    {
+      "name": "s020_u06",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 6000,
+      "count": 20
+    },
+    {
+      "name": "s021_u10",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 10000,
+      "count": 20
+    },
+    {
+      "name": "s022_u14",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 14000,
+      "count": 20
+    },
+    {
+      "name": "s023_u18",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 18000,
+      "count": 20
+    },
+    {
+      "name": "a002_ref",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s024_u06",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 6000,
+      "count": 20
+    },
+    {
+      "name": "s025_u10",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 10000,
+      "count": 20
+    },
+    {
+      "name": "s026_u14",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 14000,
+      "count": 20
+    },
+    {
+      "name": "s027_u18",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 18000,
+      "count": 20
+    },
+    {
+      "name": "s028_u06",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 6000,
+      "count": 20
+    },
+    {
+      "name": "s029_u10",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 10000,
+      "count": 20
+    },
+    {
+      "name": "s030_u14",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 14000,
+      "count": 20
+    },
+    {
+      "name": "s031_u18",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 18000,
+      "count": 20
+    },
+    {
+      "name": "s032_u06",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 6000,
+      "count": 20
+    },
+    {
+      "name": "s033_u10",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 10000,
+      "count": 20
+    },
+    {
+      "name": "s034_u14",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 14000,
+      "count": 20
+    },
+    {
+      "name": "s035_u18",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 18000,
+      "count": 20
+    },
+    {
+      "name": "a003_ref",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s036_u06",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 6000,
+      "count": 20
+    },
+    {
+      "name": "s037_u10",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 10000,
+      "count": 20
+    },
+    {
+      "name": "s038_u14",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 14000,
+      "count": 20
+    },
+    {
+      "name": "s039_u18",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 18000,
+      "count": 20
+    },
+    {
+      "name": "s040_u06",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 6000,
+      "count": 20
+    },
+    {
+      "name": "s041_u10",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 10000,
+      "count": 20
+    },
+    {
+      "name": "s042_u14",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 14000,
+      "count": 20
+    },
+    {
+      "name": "s043_u18",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 18000,
+      "count": 20
+    },
+    {
+      "name": "s044_u06",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 6000,
+      "count": 20
+    },
+    {
+      "name": "s045_u10",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 10000,
+      "count": 20
+    },
+    {
+      "name": "s046_u14",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 14000,
+      "count": 20
+    },
+    {
+      "name": "s047_u18",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 18000,
+      "count": 20
+    },
+    {
+      "name": "a004_ref",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s048_u06",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 6000,
+      "count": 20
+    },
+    {
+      "name": "s049_u10",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 10000,
+      "count": 20
+    },
+    {
+      "name": "s050_u14",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 14000,
+      "count": 20
+    },
+    {
+      "name": "s051_u18",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 18000,
+      "count": 20
+    },
+    {
+      "name": "s052_u06",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 6000,
+      "count": 20
+    },
+    {
+      "name": "s053_u10",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 10000,
+      "count": 20
+    },
+    {
+      "name": "s054_u14",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 14000,
+      "count": 20
+    },
+    {
+      "name": "s055_u18",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 18000,
+      "count": 20
+    },
+    {
+      "name": "s056_u06",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 6000,
+      "count": 20
+    },
+    {
+      "name": "s057_u10",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 10000,
+      "count": 20
+    },
+    {
+      "name": "s058_u14",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 14000,
+      "count": 20
+    },
+    {
+      "name": "s059_u18",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 18000,
+      "count": 20
+    },
+    {
+      "name": "a005_ref",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s060_u06",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 6000,
+      "count": 20
+    },
+    {
+      "name": "s061_u10",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 10000,
+      "count": 20
+    },
+    {
+      "name": "s062_u14",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 14000,
+      "count": 20
+    },
+    {
+      "name": "s063_u18",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 18000,
+      "count": 20
+    },
+    {
+      "name": "s064_u06",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 6000,
+      "count": 20
+    },
+    {
+      "name": "s065_u10",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 10000,
+      "count": 20
+    },
+    {
+      "name": "s066_u14",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 14000,
+      "count": 20
+    },
+    {
+      "name": "s067_u18",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 18000,
+      "count": 20
+    },
+    {
+      "name": "s068_u06",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 6000,
+      "count": 20
+    },
+    {
+      "name": "s069_u10",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 10000,
+      "count": 20
+    },
+    {
+      "name": "s070_u14",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 14000,
+      "count": 20
+    },
+    {
+      "name": "s071_u18",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 18000,
+      "count": 20
+    },
+    {
+      "name": "a006_ref",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s072_u06",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 6000,
+      "count": 20
+    },
+    {
+      "name": "s073_u10",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 10000,
+      "count": 20
+    },
+    {
+      "name": "s074_u14",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 14000,
+      "count": 20
+    },
+    {
+      "name": "s075_u18",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 18000,
+      "count": 20
+    },
+    {
+      "name": "s076_u06",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 6000,
+      "count": 20
+    },
+    {
+      "name": "s077_u10",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 10000,
+      "count": 20
+    },
+    {
+      "name": "s078_u14",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 14000,
+      "count": 20
+    },
+    {
+      "name": "s079_u18",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 18000,
+      "count": 20
+    },
+    {
+      "name": "s080_u06",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 6000,
+      "count": 20
+    },
+    {
+      "name": "s081_u10",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 10000,
+      "count": 20
+    },
+    {
+      "name": "s082_u14",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 14000,
+      "count": 20
+    },
+    {
+      "name": "s083_u18",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 18000,
+      "count": 20
+    },
+    {
+      "name": "a007_ref",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s084_u06",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 6000,
+      "count": 20
+    },
+    {
+      "name": "s085_u10",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 10000,
+      "count": 20
+    },
+    {
+      "name": "s086_u14",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 14000,
+      "count": 20
+    },
+    {
+      "name": "s087_u18",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 18000,
+      "count": 20
+    },
+    {
+      "name": "s088_u06",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 6000,
+      "count": 20
+    },
+    {
+      "name": "s089_u10",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 10000,
+      "count": 20
+    },
+    {
+      "name": "s090_u14",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 14000,
+      "count": 20
+    },
+    {
+      "name": "s091_u18",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 18000,
+      "count": 20
+    },
+    {
+      "name": "s092_u06",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 6000,
+      "count": 20
+    },
+    {
+      "name": "s093_u10",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 10000,
+      "count": 20
+    },
+    {
+      "name": "s094_u14",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 14000,
+      "count": 20
+    },
+    {
+      "name": "s095_u18",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 18000,
+      "count": 20
+    }
   ]
 }

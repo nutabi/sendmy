@@ -8,7 +8,9 @@
     "poll": true,
     "poll_interval_s": 30,
     "detections_before_remove": 2,
-    "lost_timeout_s": 300,
+    "fast_timeout_s": 120,
+    "sweep_interval_s": 300,
+    "sweep_max_passes": 4,
     "queue_soft_cap": 8
   },
   "density": {
@@ -16,33 +18,34 @@
     "interval_s": 30,
     "window_s": 10
   },
-  "_note": "Smoke test of the 3-time-series harness. ~15 min. Confirm transmission.csv + detection.csv fill during the run, the single continuous poller keeps fetching earlier cells while later ones flash, density.csv fills, and analyze.py writes summary.csv at the end. Re-derive offline with: analyze.py results/<run> --deliver-window-s 300",
+  "_note": "PRE-FLIGHT for the run series (~15-20 min). Run this before every long run: it exercises the two-tier poller, the density logger, the serial path and the txdbm path end to end, so a night is never lost to a broken rig. Its timings are DELIBERATELY compressed and are the one place the series' standard instrument block does not apply -- a short fast_timeout_s (120s) hands still-unseen keys to the slow tier, which re-sweeps every 300s (production: 900s) so the slow tier exercises inside a short run. Confirm afterwards: detection.csv holds fast-tier hits with first_fetched_at (propagation), deliverability.csv holds any slow-tier hits with swept_at and no first_fetched_at, and analyze deliverability is the union of the two while propagation stays detection-only. Cell a000_ref is the series ANCHOR condition and should come back 20/20 -- if it does not, the rig or the site is off before you commit a night to it. Ground truth: resweep.py results/<run>.",
   "cells": [
     {
-      "name": "r0_adv1000",
+      "name": "a000_ref",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s000_adv1000",
       "mode": "incremental",
       "adv_interval_ms": 1000,
       "update_interval_ms": 60000,
       "count": 1
     },
     {
-      "name": "r0_adv9000",
+      "name": "s001_adv9000",
       "mode": "incremental",
       "adv_interval_ms": 9000,
       "update_interval_ms": 60000,
       "count": 1
     },
     {
-      "name": "r1_adv1000",
+      "name": "s002_adv1000",
       "mode": "incremental",
       "adv_interval_ms": 1000,
-      "update_interval_ms": 60000,
-      "count": 1
-    },
-    {
-      "name": "r1_adv9000",
-      "mode": "incremental",
-      "adv_interval_ms": 9000,
       "update_interval_ms": 60000,
       "count": 1
     }
