@@ -109,6 +109,12 @@ the `ready` marker appears. Under the automated harness you never do this;
 
 ## Automated matrix runs
 
+> **Running the current experiment series?** [`RUNPLAN.md`](RUNPLAN.md) is the
+> operating document: which matrices to run in what order, the standard
+> instrument block that keeps them comparable, the anchor-cell convention, the
+> antenna protocol, and the decision gates between nights. Read it before
+> starting a run or editing a `matrix.*.json`.
+
 `run_matrix.py` (at the espbench root, beside the `matrix.*.json` definitions)
 drives the whole experiment loop. **Launch it from an ESP-IDF-activated shell**
 (so `idf.py` is on PATH) with the board attached. It **flashes the generic
