@@ -1,8 +1,9 @@
 # espbench run series
 
-Four runs over five nights, designed as one series rather than four experiments.
-Each answers the question the previous one raised, and all of them are measured
-the same way so their results can be put on the same axes.
+A series rather than a set of experiments: each run answers the question the
+previous one raised, and all are measured the same way so their results sit on
+the same axes. Runs 1, 1b, 2 and 3 are complete (all on 2026-08-07/08); run 4
+remains, and needs a location the others did not.
 
 ## What makes them comparable
 
@@ -43,11 +44,16 @@ Deliverability still comes from `resweep.py` in every case. The live poller is
 never the ground truth.
 
 **2. One transmit axis.** Advertising interval scales with dwell to hold
-**broadcasts per key at 5** in every matrix that sweeps dwell. Dwell therefore
-means the same thing in run 2 as in run 4 as in the completed dwell factorial,
-and the dwell axis can be plotted continuously from 1 s to 16 s across runs. The
-one exception is run 1, which inherits the original fixed-`adv` design because
-it is a replication (see below).
+**broadcasts per key at 5** in every matrix that sweeps dwell, so dwell means the
+same thing across runs and can be plotted continuously from 1 s to 8 s.
+
+*Run 3 exposed the cost of this convention.* Holding broadcasts constant forces
+`adv = dwell/5`, which makes `adv` and dwell perfectly confounded inside any
+dwell sweep — and run 3 found a 22.6-point penalty that tracks `adv` (600 and
+1200 ms bad; 200, 400, 800 ms fine) rather than dwell. The convention is still
+right for isolating dwell from broadcast count, but **`adv` is now a known latent
+covariate in every dwell sweep**, and a fine `adv` sweep at fixed dwell and fixed
+broadcasts is needed to characterise it.
 
 **3. One anchor condition.** Cells named `a###_ref` are the shared reference:
 `incremental`, adv 1 s, 8 s dwell, 20 windows, +9 dBm. One opens every run and
@@ -58,15 +64,17 @@ density announces itself instead of quietly biasing the contrast.
 
 The anchor is only a valid reference **within one antenna state** — the same cell
 transmitted without the directional antenna is physically a different condition.
-So the series has a **baseline state: antenna FITTED**. Runs 1, 3 and 4 and the
-`_ant` half of run 2 all sit in it and share one anchor chain; the `_noant` half
-is the single deliberate departure, and its anchors are what measure the
-antenna's own worth. Run anything else antenna-off and its anchors stop comparing
-to the rest of the series.
+So the series has a **baseline state: antenna FITTED**. Runs 1, 2, 3 and 4 all sit
+in it and share one anchor chain; run 1b is the single deliberate departure, and
+its anchors are what measured the antenna's own worth. Run anything else
+antenna-off and its anchors stop comparing to the rest of the series.
 
-The anchor is also the density probe's only cell, so run 3 is simultaneously the
-deep characterisation of the exact condition the other runs spot-check. Analyse
-anchors across runs first; then read each run's own contrast.
+**The anchor design is validated.** It read 99.4% in run 1, 99.4% in run 2 and
+100.0% in run 3 — three runs, two cables, one hardware failure and a full day of
+elapsed time between them. That reproducibility is what licenses pooling nights,
+and it is what let run 3 attribute a 22-point drop to the transmit parameters
+rather than to the night. Analyse anchors across runs first; then read each run's
+own contrast.
 
 ## The series
 
@@ -75,7 +83,7 @@ anchors across runs first; then read each run's own contrast.
 | 1 | `matrix.txpower_dwell_ant.json` | 2.7 h | Was it dwell or signal strength? | **done** 2026-08-07 |
 | 1b | `matrix.txpower_dwell_noant.json` (+ `_resume`) | 2.7 h | Can antenna removal serve as an attenuation dial? | **done** — answer: no |
 | 2 | `matrix.broadcasts.json` (+ `_resume`) | 2.8 h | Dwell or broadcast count? | **done** — answer: broadcast count |
-| 3 | `matrix.dwell_low.json` | ~3.3 h | Is there a dwell floor below 4 s, where scan duty cycle bites? |  |
+| 3 | `matrix.dwell_low.json` | 4.5 h | Is there a dwell floor below 4 s? | **done** — answer: no, but `adv` bands found |
 | 4 | `matrix.density.json` | ~6 h | Does the broadcast rule hold as the city empties? |  |
 | — | `matrix.throughput.json` | ~6.8 h | **Dropped** — see below |  |
 
@@ -187,19 +195,37 @@ night to it.
 
 ### Per night
 
-| Night | Matrices, in order | Antenna | Wall |
-|---|---|---|---|
-| 1 | `txpower_dwell_ant` → `txpower_dwell_noant` | fitted → **removed at the swap** | ~5.9 h |
-| 2 | `txpower_dwell_noant` → `txpower_dwell_ant` | removed → **refitted at the swap** | ~5.9 h |
-| 3 | `throughput` | fitted | ~7.0 h |
-| 4 | `density` | fitted | ~5.6 h |
-| 5 | `dwell_low` | fitted, unless run 1 says otherwise | ~3.6 h |
+| Night | Matrices, in order | Antenna | Wall | |
+|---|---|---|---|---|
+| 1 | `txpower_dwell_ant` → `txpower_dwell_noant` (+ `_resume`) → `broadcasts` (+ `_resume`) → `dwell_low` | fitted → removed → refitted | ~18 h | **done** 2026-08-07/08 |
+| 2 | `density` | fitted | ~6.5 h | needs a location with real footfall — see below |
 
-Nights 1 and 2 are the same pair in reversed order, and they stay **adjacent** so
-the crossover's two halves see similar ambient conditions — do not put another
-run between them. You swap the antenna once per night, between the two runs.
-Mark its orientation before the first removal and refit it identically, or the
-"fitted" anchors on later nights are measuring a different rig.
+Everything through run 3 landed on one long night. The planned crossover
+(nights 1 and 2 as the same pair reversed) was **abandoned**: run 1b showed
+antenna-off is a regime switch rather than a dial, and matched BLE density across
+the two halves ruled out the diurnal confound directly, so the second night would
+have bought nothing. If the antenna ever comes off again, mark its orientation
+first and refit it identically, or the "fitted" anchors stop describing the same
+rig.
+
+**`density` needs a different location.** Ambient density at the spot used for
+runs 1–3 barely moves: per-run mean finders were 11.1 / 11.7 / 10.6 / 13.2 / 13.5
+across 12:34 → 02:07, while within-hour scatter ran 3–23. The noise is several
+times the diurnal signal, so a time-based density run there produces a flat line
+whatever the probes are set to — the same failure the rebuilt matrix was meant to
+avoid, arriving by a different route. Scout candidates first, without the board:
+
+```sh
+$PY scripts/scan_density.py --watch --interval 60 --out /tmp/scout.csv
+```
+
+Look for transient footfall (canteen, lecture-theatre exit, MRT concourse,
+library entrance) rather than a residence or office, where the same phones are
+present at 03:00 and 15:00. The size of the *transition* matters more than the
+absolute level. Moving location confounds the anchor's cross-run role, which is
+acceptable here because the question is entirely internal — probes falling while
+the anchor holds — but record the location in the matrix `_note`, since nothing
+in the harness captures it.
 
 Watch progress with `scripts/dashboard.py`. After each run:
 
@@ -391,6 +417,74 @@ each other — that is the practical design space for the protocol.
   −24 dBm it sits near 90%, with real headroom — but it is now a *secondary*
   question. Whether sub-4 s dwell hurts is only interesting because dwell
   otherwise does nothing.
+
+### Run 3 — sub-4 s dwell at −24 dBm (2026-08-08)
+
+`results/dwell_low_20260807T180544Z`. 165 cells / 3300 keys, 5 broadcasts per key
+throughout (`adv = dwell/5`), antenna fitted, offline resweep. Ran 02:05–06:39
+with **no errors and no USB dropout** — the cable swap holds.
+
+| dwell | 1000 ms | 2000 ms | 3000 ms | 4000 ms | 6000 ms |
+|---|---|---|---|---|---|
+| (adv) | 200 ms | 400 ms | 600 ms | 800 ms | 1200 ms |
+| delivered | **91.7%** | 90.2% | **65.0%** | 90.2% | **71.2%** |
+
+Anchors 300/300 = **100.0%**.
+
+**There is no short-dwell floor. The hypothesis this run was built on is dead.**
+1 s dwell delivers 91.7% — the *highest* of any level. If relay scan duty cycle
+imposed a floor, 1 s would be the worst cell in the matrix; it is the best. Dwell
+between 1 s and 6 s does nothing, which now covers 1–8 s across runs 1 and 3.
+
+**But the result is not flat — it is non-monotone, and the split is by `adv`,
+not dwell.** Group the levels by advertising interval and the anomaly is exact:
+
+| adv | rate | cells |
+|---|---|---|
+| 200 / 400 / 800 ms | **90.7%** | 90 |
+| 600 / 1200 ms | **68.1%** | 60 |
+
+**+22.6 points, p < 0.0001** (cell-clustered permutation, 20 000 shuffles). The
+depression is systematic, not a few bad cells: every d3000 cell lands between
+10 and 18 of 20 and every d6000 cell between 11 and 17, while the clean levels
+cluster 16–20. It is not drift — first half 82.1% against second half 81.2%,
+and all 15 anchors read a perfect 20/20 across the whole night.
+
+*Do not quote a dwell slope for this run.* A regression on log dwell returns
+−0.071 per doubling at p < 0.0001, but the relationship is not ordered in dwell
+(1000 and 4000 are both fine, 3000 and 6000 are both bad), so that number
+describes nothing real.
+
+**Leading hypothesis: BLE channel aliasing.** Advertising events rotate across
+channels 37/38/39 while scanners dwell on one channel at a time. When the
+advertising interval resonates with a scanner's hop period, a scanner can land
+on the wrong channel repeatedly. The spec's mandated 0–10 ms random delay per
+advertising event exists to break exactly this, but with only 5 broadcasts per
+key there is little opportunity to average out. This is a hypothesis, not a
+finding.
+
+**Caveat that blocks a stronger claim:** this design pins `adv = dwell/5`, so
+`adv` and dwell are perfectly confounded within it. Attributing the effect to
+`adv` rests on the *shape* — dwell admits no ordering that produces
+fine/fine/bad/fine/bad, while `adv` splits it cleanly — not on independent
+evidence. Run 2 offers no cross-check: it used adv 250/500/1000/2000/4000 and
+never visited 600 or 1200 ms.
+
+**Changes this forces:**
+
+- **The highest-value experiment now written is a fine `adv` sweep at fixed
+  dwell and fixed broadcasts** — e.g. adv 200…1400 ms in 100 ms steps, dwell
+  pinned, broadcasts pinned — to separate `adv` from dwell and map where the
+  penalty bands sit. If it reproduces, it is a genuine protocol-design finding:
+  some advertising intervals are simply bad, independent of how often you send.
+- **Nothing in the series so far controlled `adv` independently.** Runs 1 and 1b
+  scaled it with dwell to hold broadcasts constant; run 2 varied it *as* the
+  broadcast axis. If certain `adv` values carry a penalty, it is a latent
+  covariate in every result to date — though it cannot explain run 2's headline,
+  since that curve is monotone across five `adv` values and 55 points deep.
+- **The ≥8 broadcasts recommendation stands** but should be stated as
+  "≥8 broadcasts per key, avoiding advertising intervals near 600 and 1200 ms
+  pending the sweep."
 
 ## Retained from the earlier corpus
 
