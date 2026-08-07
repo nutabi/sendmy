@@ -332,6 +332,56 @@ ceiling.
   first monitor had no pattern for it and missed the real failure while firing a
   false one.
 
+### Run 2 — broadcasts × TX power, antenna fitted (2026-08-07/08)
+
+`results/broadcasts_20260807T133206Z` **plus**
+`results/broadcasts_resume_20260807T142927Z` (a second USB dropout, at
+`s032_pn24_b04`; drop the parent's 1-window `s032`). 99 cells / 1980 keys,
+dwell pinned at 4000 ms, offline resweep.
+
+| broadcasts/key | 1 | 2 | 4 | 8 | 16 |
+|---|---|---|---|---|---|
+| **+9 dBm** | 86.1% | 98.3% | 96.7% | 100.0% | 100.0% |
+| **−24 dBm** | 42.8% | 66.1% | 83.3% | 97.2% | 100.0% |
+
+Anchors 179/180 = **99.4%**, identical to run 1's 99.4%.
+
+**Broadcast count is the driver. This is the answer to the confound.** Over
+1→8 broadcasts at fixed dwell, delivery rises **+18.1 points per doubling at
+−24 dBm** and **+4.0 at +9 dBm**, both **p < 0.0001** (cell-clustered
+permutation on log2 broadcasts, 20 000 shuffles). Runs 1 and 1b moved dwell with
+broadcasts pinned and found nothing, twice. This run moved broadcasts with dwell
+pinned and found a 42.8% → 97.2% climb. The factor the project attributed to
+dwell for its entire history is broadcast count.
+
+**The old "rotation" result reproduces from broadcast count alone.** That run
+read 80/92/99% at 4/8/16 s dwell with `adv` pinned at 2000 ms — i.e. 2/4/8
+broadcasts per key. This run's −24 dBm arm at 2/4/8 broadcasts reads
+**66/83/97%**: the same curve and the same shape, off only by the power offset
+between the two attenuation settings. Dwell was never doing the work.
+
+**Power sets where the curve saturates, not whether it rises.** +9 dBm is
+already at 98% by 2 broadcasts and pinned at 100% from 8; −24 dBm needs 8 to
+reach 97% and 16 to reach 100%. TX power and broadcast count trade off against
+each other — that is the practical design space for the protocol.
+
+**Changes this forces:**
+
+- **≥8 broadcasts per key is the safe operating point**, and 16 buys full
+  delivery even at the −24 dBm floor. The standard 5-broadcast axis used in runs
+  1/1b sits on the steep part of the curve at low power, which is exactly why
+  those runs had headroom — that was luck, not design.
+- **The anchor chain validates the series.** 99.4% here against 99.4% in run 1,
+  on a different night with a different cable, means the two nights' networks
+  were equivalent and cross-run comparison is sound.
+- **The live poller's "b16 dip" was pure artifact.** Live data showed −24 dBm
+  b16 at 58.3%, driven by one cell reading 1/20; the resweep puts it at 100%.
+  Never read a shape off the live poller.
+- **`matrix.dwell_low.json` is still worth running** — at 5 broadcasts and
+  −24 dBm it sits near 90%, with real headroom — but it is now a *secondary*
+  question. Whether sub-4 s dwell hurts is only interesting because dwell
+  otherwise does nothing.
+
 ## Retained from the earlier corpus
 
 `matrix.advertising.json`, `matrix.dwell_isobroadcast.json` and
