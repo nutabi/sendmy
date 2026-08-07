@@ -36,8 +36,22 @@ def color(pct: float) -> str:
     return "\033[31m"                 # red
 
 
+RUN_TS_RE = re.compile(r"(\d{8}T\d{6}Z)$")
+
+
 def latest_run() -> Path | None:
-    runs = sorted((ROOT / "results").glob("*/"), key=lambda p: p.name)
+    """Most recent run dir, by the trailing UTC stamp.
+
+    Run dirs are `<matrix-label>_<stamp>` (older ones are a bare `<stamp>`), so
+    sorting by name would order by label first and pick the alphabetically last
+    matrix rather than the newest run. Sort on the stamp, falling back to mtime
+    for a dir that does not carry one.
+    """
+    def key(p: Path) -> tuple[int, str | float]:
+        m = RUN_TS_RE.search(p.name)
+        return (1, m.group(1)) if m else (0, p.stat().st_mtime)
+
+    runs = sorted((ROOT / "results").glob("*/"), key=key)
     return runs[-1] if runs else None
 
 
