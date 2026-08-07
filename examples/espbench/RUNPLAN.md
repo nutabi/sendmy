@@ -70,59 +70,69 @@ anchors across runs first; then read each run's own contrast.
 
 ## The series
 
-| # | Matrix | Transmit | Answers |
-|---|---|---|---|
-| 1 | `matrix.txpower_dwell_ant.json` + `_noant.json` | 2.7 h each | Was it dwell or signal strength? Can we leave the ceiling on purpose? |
-| 2 | `matrix.throughput.json` | ~6.8 h | Is the instrument sound? |
-| 3 | `matrix.density.json` | ~5.3 h | Is the ceiling the channel's or the city's? |
-| 4 | `matrix.dwell_low.json` | ~3.3 h | Where is the dwell knee, once we can get below the ceiling? |
+| # | Matrix | Transmit | Answers | Status |
+|---|---|---|---|---|
+| 1 | `matrix.txpower_dwell_ant.json` | 2.7 h | Was it dwell or signal strength? | **done** 2026-08-07 |
+| 1b | `matrix.txpower_dwell_noant.json` (+ `_resume`) | 2.7 h | Can antenna removal serve as an attenuation dial? | **done** — answer: no |
+| 2 | `matrix.broadcasts.json` (+ `_resume`) | 2.8 h | Dwell or broadcast count? | **done** — answer: broadcast count |
+| 3 | `matrix.dwell_low.json` | ~3.3 h | Is there a dwell floor below 4 s, where scan duty cycle bites? |  |
+| 4 | `matrix.density.json` | ~6 h | Does the broadcast rule hold as the city empties? |  |
+| — | `matrix.throughput.json` | ~6.8 h | **Dropped** — see below |  |
 
-Add `settle_seconds` (15 min) to each, and run `matrix.smoke.json` (~15 min)
-before every one.
+Numbering follows what was actually run, not the original plan. Add
+`settle_seconds` (15 min) to each, and run `matrix.smoke.json` (~15 min) before
+every one.
 
-**Run 1 — TX × dwell.** Dwell 2/4/8 s crossed with TX {+9 dBm, −24 dBm}. Resolves
+**Run 1 — TX × dwell.** Dwell 2/4/8 s crossed with TX {+9 dBm, −24 dBm}. Resolved
 the confound in the old TX × rotation run, every arm of which was attenuated, so
-its flat-TX finding covers only the attenuated tail while its large rotation
-effect may not be a dwell effect at all. The larger purpose is to establish
-attenuation as a **dial for leaving the delivery ceiling**, since no parameter is
-measurable while everything delivers.
+its flat-TX finding covered only the attenuated tail. Led the series because it
+depended on the least: deliverability comes from the offline resweep, which is
+immune to poller behaviour.
 
-It leads the series because it carries the most value and depends on the least:
-deliverability comes from the offline resweep, which is immune to poller
-behaviour, so its headline result does not wait on run 2's verdict. It is also
-the harder test of the standard instrument block — ~13 keys/min against run 2's
-~5 — so a problem with the larger queue cap surfaces on the first night rather
-than the third.
+**Run 1b — the same design with the antenna removed**, intended to establish
+attenuation as a second dial for leaving the delivery ceiling. *The antenna
+protocol is retired.* It called for running both states back to back and then
+reversing the order on a second night, so antenna state crossed time-of-night.
+That was never needed: antenna-off turned out to be a regime switch, not a dial
+(0/900 keys at −24 dBm), and matched BLE density across the two nights ruled out
+the diurnal confound directly. **Use TX power with the antenna fitted.**
 
-*Antenna protocol.* The directional antenna cannot be switched under program
-control, so it is a between-run block. Run both files back to back on one night,
-then **reverse the order on a second night**, so antenna state is crossed against
-time-of-night instead of confounded with it. The `txdbm` axis inside each run is
-interleaved and clean on its own; the anchors measure what the antenna itself is
-worth, since the same reference condition runs in both states.
+**Run 2 — broadcasts × TX power.** Dwell pinned at 4000 ms, broadcasts varied
+1/2/4/8/16 via `adv`, crossed with TX {+9, −24} dBm. The complement of runs 1
+and 1b, and the run that closed the project's central question.
 
-**Run 2 — replication.** Re-asks the project's first question with the fixed
-instrument, on deliberately unchanged cells. Success is not a new finding: it is
-live and offline deliverability agreeing to within a key or two, and the original
-"longer dwell delivers better" trend failing to reappear. It also produces
-retained artifacts for a run whose originals were lost. Running it second rather
-than first costs little — every run's deliverability comes from the resweep
-regardless, so what this validates is the interpretation of the *live* series and
-the propagation figures, both of which can be re-read after the fact.
+**Run 3 — sub-4 s dwell.** Extends run 1's dwell axis down to 1 s on the same
+iso-broadcast footing (5 broadcasts/key, −24 dBm), which run 2 places near 87% —
+on the steep part of the curve with headroom both ways. Now that dwell is known
+to do nothing between 2 and 8 s, the open question is narrower and more physical:
+**relay devices scan intermittently**, so below some dwell a key can be missed
+entirely no matter how often it is broadcast inside the window. Run 2 cannot see
+this — it pinned dwell at 4000 ms throughout. The queue stays inside the 256 cap:
+it is fed by the block-average key rate (~17/min, since every block cycles all
+five dwell levels), not the instantaneous rate during the 1 s cells.
 
-**Run 3 — density.** 120 repeats of the anchor, back to back, ideally across a
-busy→quiet transition. Nothing varies but time, so deliverability variation is
-attributable to ambient density alone. Turns the anchors scattered through the
-other runs into points on a density curve.
+**Run 4 — density.** Ideally across a busy→quiet transition, with nothing varying
+but time, so deliverability variation is attributable to ambient density alone.
+**The original design is void and has been rebuilt.** It was 120 repeats of the
+anchor — 8 broadcasts at +9 dBm — which run 2 measured at 100.0%; every cell
+would have delivered fully however quiet the night got, and the run would have
+produced a flat line. An anchor is chosen to be *stable*, which is the right
+property for a reference and exactly the wrong one for a probe. The rebuilt
+matrix keeps the anchor as the stability reference and adds two **fragile**
+probes at 4 and 2 broadcasts, −24 dBm (83.3% and 66.1% in run 2), where ambient
+change has room to move the number in both directions.
 
-**Run 4 — sub-4 s dwell.** Extends run 1's dwell axis down to 1 s on the same
-iso-broadcast footing. **Run it at whichever attenuation run 1 puts below the
-ceiling** — at full power the dwell factorial already delivered 100% at 4 s, so a
-full-power pass is expected to stay flat and answer nothing. Together runs 1 and
-4 give dwell from 1 s to 8 s at one power setting. The queue stays inside the
-256 cap here: it is fed by the block-average key rate (~17/min, since every block
-cycles all five dwell levels), not the instantaneous rate during the 1 s cells,
-and it drains at the ~158 s median detection time.
+This is now the main external-validity test of everything the series has found:
+whether "≥8 broadcasts per key" is a general rule or a rule about this location
+at this hour.
+
+**Dropped — `matrix.throughput.json`.** It asked two things. The "does the old
+longer-dwell-delivers-better trend reappear" half is answered three times over,
+and its own design reproduces the original confound: `adv` pinned at 1000 ms
+means its dwell levels 6/10/14/18 s *are* 6/10/14/18 broadcasts per key. The
+live-vs-offline agreement half is still worth checking and got more urgent, not
+less — but that is a free comparison on any run, not a 6.8 h experiment. Compare
+`detection.csv` against `resweep.csv` on each run instead.
 
 ## Operating the series
 

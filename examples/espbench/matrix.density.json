@@ -18,7 +18,7 @@
     "interval_s": 30,
     "window_s": 10
   },
-  "_note": "RUN 3 of the series -- diurnal / crowd-density probe. 120 repeats of the series ANCHOR condition (incremental, adv 1s, 8s dwell, 20 windows, +9 dBm) back to back over ~5.3h, one time-point every ~160s. Nothing varies but time, so deliverability variation is attributable to ambient finder density alone: join each cell's deliverability to the mean finders in density.csv over its send window. This answers the question every other run begs -- whether the ~99.9% ceiling belongs to the channel or to this site at this hour -- and because its cell IS the anchor, it calibrates the anchor readings sprinkled through the other runs into a density curve rather than isolated spot checks. Best run across a busy->quiet transition. Ground truth: resweep.py. ANCHOR CELLS: cells named a###_ref are the series' shared reference condition (incremental, adv 1s, 8s dwell, 20 windows, +9 dBm) -- the same cell the density matrix repeats 120 times. One opens every run and one follows every few blocks, ~10% of the run. They are not part of this matrix's design; they exist so any two nights can be compared against a condition they actually share, and so a night whose ambient density was unusual announces itself instead of silently biasing the comparison. Analyse them across runs first, then read the run's own contrast. ANTENNA STATE: directional antenna FITTED -- the series BASELINE state. Runs 1, 3 and 4 all use it, so their anchor cells form one comparable chain; only the txpower_dwell_noant half departs from it. If you run this with the antenna off, its anchors do NOT compare against the rest of the series -- record it and say so.",
+  "_note": "DENSITY over time. Nothing varies but the hour -- ideally run across a busy->quiet transition -- so deliverability variation is attributable to ambient relay density alone.\n\nREBUILT 2026-08-08. The original was 120 repeats of the anchor alone (8 broadcasts, +9 dBm). Run 2 measured that exact condition at 100.0%, so every cell would have delivered fully however quiet the night became and the run would have produced a flat line. An anchor is chosen to be STABLE, which is right for a cross-run reference and exactly wrong for a probe.\n\nThree conditions x 40 reps, dwell held at 8000 ms throughout so only broadcasts and power differ:\n  a###_ref  adv 1000, +9 dBm,  8 broadcasts -- run 2: 100.0%. Stability reference and the chain back to runs 1/1b/2, which all read 99.4%.\n  d###_p04  adv 2000, -24 dBm, 4 broadcasts -- run 2: 83.3%. Fragile, headroom both ways.\n  d###_p02  adv 4000, -24 dBm, 2 broadcasts -- run 2: 66.1%. Steepest part of the curve, most sensitive to ambient change; two probes guard against picking the wrong fragility.\n\nCondition order rotates one slot per block so none holds a fixed position in the hour. Read the probes against the anchor: if the anchor holds near 100% while the probes fall, the change is ambient density and not the instrument or the board.\n\nThis is the main external-validity test of the series -- whether '>=8 broadcasts per key' is a general rule or a rule about this location at this hour. ANTENNA FITTED.",
   "cells": [
     {
       "name": "a000_ref",
@@ -29,12 +29,52 @@
       "tx_power_dbm": 9
     },
     {
+      "name": "d000_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d000_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d001_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d001_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
       "name": "a001_ref",
       "mode": "incremental",
       "adv_interval_ms": 1000,
       "update_interval_ms": 8000,
       "count": 20,
       "tx_power_dbm": 9
+    },
+    {
+      "name": "d002_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
     },
     {
       "name": "a002_ref",
@@ -45,12 +85,52 @@
       "tx_power_dbm": 9
     },
     {
+      "name": "d002_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
       "name": "a003_ref",
       "mode": "incremental",
       "adv_interval_ms": 1000,
       "update_interval_ms": 8000,
       "count": 20,
       "tx_power_dbm": 9
+    },
+    {
+      "name": "d003_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d003_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d004_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d004_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
     },
     {
       "name": "a004_ref",
@@ -61,12 +141,28 @@
       "tx_power_dbm": 9
     },
     {
+      "name": "d005_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
       "name": "a005_ref",
       "mode": "incremental",
       "adv_interval_ms": 1000,
       "update_interval_ms": 8000,
       "count": 20,
       "tx_power_dbm": 9
+    },
+    {
+      "name": "d005_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
     },
     {
       "name": "a006_ref",
@@ -77,12 +173,52 @@
       "tx_power_dbm": 9
     },
     {
+      "name": "d006_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d006_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d007_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d007_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
       "name": "a007_ref",
       "mode": "incremental",
       "adv_interval_ms": 1000,
       "update_interval_ms": 8000,
       "count": 20,
       "tx_power_dbm": 9
+    },
+    {
+      "name": "d008_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
     },
     {
       "name": "a008_ref",
@@ -93,12 +229,52 @@
       "tx_power_dbm": 9
     },
     {
+      "name": "d008_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
       "name": "a009_ref",
       "mode": "incremental",
       "adv_interval_ms": 1000,
       "update_interval_ms": 8000,
       "count": 20,
       "tx_power_dbm": 9
+    },
+    {
+      "name": "d009_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d009_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d010_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d010_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
     },
     {
       "name": "a010_ref",
@@ -109,12 +285,28 @@
       "tx_power_dbm": 9
     },
     {
+      "name": "d011_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
       "name": "a011_ref",
       "mode": "incremental",
       "adv_interval_ms": 1000,
       "update_interval_ms": 8000,
       "count": 20,
       "tx_power_dbm": 9
+    },
+    {
+      "name": "d011_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
     },
     {
       "name": "a012_ref",
@@ -125,12 +317,52 @@
       "tx_power_dbm": 9
     },
     {
+      "name": "d012_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d012_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d013_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d013_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
       "name": "a013_ref",
       "mode": "incremental",
       "adv_interval_ms": 1000,
       "update_interval_ms": 8000,
       "count": 20,
       "tx_power_dbm": 9
+    },
+    {
+      "name": "d014_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
     },
     {
       "name": "a014_ref",
@@ -141,12 +373,52 @@
       "tx_power_dbm": 9
     },
     {
+      "name": "d014_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
       "name": "a015_ref",
       "mode": "incremental",
       "adv_interval_ms": 1000,
       "update_interval_ms": 8000,
       "count": 20,
       "tx_power_dbm": 9
+    },
+    {
+      "name": "d015_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d015_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d016_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d016_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
     },
     {
       "name": "a016_ref",
@@ -157,12 +429,28 @@
       "tx_power_dbm": 9
     },
     {
+      "name": "d017_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
       "name": "a017_ref",
       "mode": "incremental",
       "adv_interval_ms": 1000,
       "update_interval_ms": 8000,
       "count": 20,
       "tx_power_dbm": 9
+    },
+    {
+      "name": "d017_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
     },
     {
       "name": "a018_ref",
@@ -173,12 +461,52 @@
       "tx_power_dbm": 9
     },
     {
+      "name": "d018_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d018_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d019_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d019_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
       "name": "a019_ref",
       "mode": "incremental",
       "adv_interval_ms": 1000,
       "update_interval_ms": 8000,
       "count": 20,
       "tx_power_dbm": 9
+    },
+    {
+      "name": "d020_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
     },
     {
       "name": "a020_ref",
@@ -189,12 +517,52 @@
       "tx_power_dbm": 9
     },
     {
+      "name": "d020_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
       "name": "a021_ref",
       "mode": "incremental",
       "adv_interval_ms": 1000,
       "update_interval_ms": 8000,
       "count": 20,
       "tx_power_dbm": 9
+    },
+    {
+      "name": "d021_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d021_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d022_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d022_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
     },
     {
       "name": "a022_ref",
@@ -205,12 +573,28 @@
       "tx_power_dbm": 9
     },
     {
+      "name": "d023_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
       "name": "a023_ref",
       "mode": "incremental",
       "adv_interval_ms": 1000,
       "update_interval_ms": 8000,
       "count": 20,
       "tx_power_dbm": 9
+    },
+    {
+      "name": "d023_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
     },
     {
       "name": "a024_ref",
@@ -221,12 +605,52 @@
       "tx_power_dbm": 9
     },
     {
+      "name": "d024_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d024_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d025_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d025_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
       "name": "a025_ref",
       "mode": "incremental",
       "adv_interval_ms": 1000,
       "update_interval_ms": 8000,
       "count": 20,
       "tx_power_dbm": 9
+    },
+    {
+      "name": "d026_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
     },
     {
       "name": "a026_ref",
@@ -237,12 +661,52 @@
       "tx_power_dbm": 9
     },
     {
+      "name": "d026_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
       "name": "a027_ref",
       "mode": "incremental",
       "adv_interval_ms": 1000,
       "update_interval_ms": 8000,
       "count": 20,
       "tx_power_dbm": 9
+    },
+    {
+      "name": "d027_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d027_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d028_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d028_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
     },
     {
       "name": "a028_ref",
@@ -253,12 +717,28 @@
       "tx_power_dbm": 9
     },
     {
+      "name": "d029_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
       "name": "a029_ref",
       "mode": "incremental",
       "adv_interval_ms": 1000,
       "update_interval_ms": 8000,
       "count": 20,
       "tx_power_dbm": 9
+    },
+    {
+      "name": "d029_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
     },
     {
       "name": "a030_ref",
@@ -269,12 +749,52 @@
       "tx_power_dbm": 9
     },
     {
+      "name": "d030_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d030_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d031_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d031_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
       "name": "a031_ref",
       "mode": "incremental",
       "adv_interval_ms": 1000,
       "update_interval_ms": 8000,
       "count": 20,
       "tx_power_dbm": 9
+    },
+    {
+      "name": "d032_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
     },
     {
       "name": "a032_ref",
@@ -285,12 +805,52 @@
       "tx_power_dbm": 9
     },
     {
+      "name": "d032_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
       "name": "a033_ref",
       "mode": "incremental",
       "adv_interval_ms": 1000,
       "update_interval_ms": 8000,
       "count": 20,
       "tx_power_dbm": 9
+    },
+    {
+      "name": "d033_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d033_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d034_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d034_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
     },
     {
       "name": "a034_ref",
@@ -301,12 +861,28 @@
       "tx_power_dbm": 9
     },
     {
+      "name": "d035_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
       "name": "a035_ref",
       "mode": "incremental",
       "adv_interval_ms": 1000,
       "update_interval_ms": 8000,
       "count": 20,
       "tx_power_dbm": 9
+    },
+    {
+      "name": "d035_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
     },
     {
       "name": "a036_ref",
@@ -317,12 +893,52 @@
       "tx_power_dbm": 9
     },
     {
+      "name": "d036_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d036_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d037_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "d037_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
       "name": "a037_ref",
       "mode": "incremental",
       "adv_interval_ms": 1000,
       "update_interval_ms": 8000,
       "count": 20,
       "tx_power_dbm": 9
+    },
+    {
+      "name": "d038_p02",
+      "mode": "incremental",
+      "adv_interval_ms": 4000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
     },
     {
       "name": "a038_ref",
@@ -333,6 +949,14 @@
       "tx_power_dbm": 9
     },
     {
+      "name": "d038_p04",
+      "mode": "incremental",
+      "adv_interval_ms": 2000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
       "name": "a039_ref",
       "mode": "incremental",
       "adv_interval_ms": 1000,
@@ -341,644 +965,20 @@
       "tx_power_dbm": 9
     },
     {
-      "name": "a040_ref",
+      "name": "d039_p04",
       "mode": "incremental",
-      "adv_interval_ms": 1000,
+      "adv_interval_ms": 2000,
       "update_interval_ms": 8000,
       "count": 20,
-      "tx_power_dbm": 9
+      "tx_power_dbm": -24
     },
     {
-      "name": "a041_ref",
+      "name": "d039_p02",
       "mode": "incremental",
-      "adv_interval_ms": 1000,
+      "adv_interval_ms": 4000,
       "update_interval_ms": 8000,
       "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a042_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a043_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a044_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a045_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a046_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a047_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a048_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a049_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a050_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a051_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a052_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a053_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a054_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a055_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a056_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a057_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a058_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a059_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a060_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a061_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a062_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a063_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a064_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a065_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a066_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a067_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a068_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a069_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a070_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a071_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a072_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a073_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a074_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a075_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a076_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a077_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a078_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a079_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a080_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a081_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a082_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a083_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a084_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a085_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a086_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a087_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a088_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a089_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a090_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a091_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a092_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a093_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a094_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a095_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a096_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a097_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a098_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a099_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a100_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a101_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a102_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a103_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a104_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a105_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a106_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a107_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a108_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a109_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a110_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a111_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a112_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a113_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a114_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a115_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a116_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a117_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a118_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
-    },
-    {
-      "name": "a119_ref",
-      "mode": "incremental",
-      "adv_interval_ms": 1000,
-      "update_interval_ms": 8000,
-      "count": 20,
-      "tx_power_dbm": 9
+      "tx_power_dbm": -24
     }
   ]
 }
