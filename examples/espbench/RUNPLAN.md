@@ -150,10 +150,26 @@ a night was unusual; they cannot tell you it was unusual because the board moved
 ### Before every run
 
 ```sh
-PY=scripts/.venv/bin/python      # system python3 lacks pyserial/findmy
+PY=scripts/.venv/bin/python                      # system python3 lacks pyserial/findmy
+export PATH="$PWD/scripts/.venv/bin:$PATH"       # run_matrix calls esptool.py by bare name
 $PY run_matrix.py matrix.<name>.json --dry-run   # cell/mid mapping, no hardware
-$PY run_matrix.py matrix.smoke.json              # ~15-20 min
+$PY run_matrix.py matrix.smoke.json --no-flash   # ~15-20 min
 ```
+
+Two environment traps, both confirmed the hard way on 2026-08-07:
+
+- `idf.py` here is a **shell alias** (`idf-env idf.py`), and `run_matrix.py` invokes
+  it as a subprocess, where aliases do not exist. Flashing from the harness fails.
+  The firmware is generic and reconfigured per cell, so `--no-flash` is the normal
+  mode for the series — flash once by hand from an IDF shell if the firmware ever
+  changes.
+- `esptool.py` is likewise absent unless the venv's `bin` is on `PATH`. It is only
+  needed by the **final** step, `park_board`, which halts the board so it stops
+  beaconing its last carrier. Without it the run completes and writes
+  `summary.csv` normally, then dies in the last few lines — and the board keeps
+  advertising that carrier into whatever you do next, including an antenna swap.
+  `pip install esptool` into the venv and export the `PATH` above, or pass
+  `--no-park` and accept the stray beacon.
 
 The smoke run opens with `a000_ref`, the series anchor, and it should come back
 20/20. If it does not, the rig or the site is off — find out before committing a
