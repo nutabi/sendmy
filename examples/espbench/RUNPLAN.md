@@ -72,27 +72,27 @@ anchors across runs first; then read each run's own contrast.
 
 | # | Matrix | Transmit | Answers |
 |---|---|---|---|
-| 1 | `matrix.throughput.json` | ~6.8 h | Is the instrument sound? |
-| 2 | `matrix.txpower_dwell_ant.json` + `_noant.json` | 2.7 h each | Was it dwell or signal strength? Can we leave the ceiling on purpose? |
+| 1 | `matrix.txpower_dwell_ant.json` + `_noant.json` | 2.7 h each | Was it dwell or signal strength? Can we leave the ceiling on purpose? |
+| 2 | `matrix.throughput.json` | ~6.8 h | Is the instrument sound? |
 | 3 | `matrix.density.json` | ~5.3 h | Is the ceiling the channel's or the city's? |
 | 4 | `matrix.dwell_low.json` | ~3.3 h | Where is the dwell knee, once we can get below the ceiling? |
 
 Add `settle_seconds` (15 min) to each, and run `matrix.smoke.json` (~15 min)
 before every one.
 
-**Run 1 — replication.** Re-asks the project's first question with the fixed
-instrument, on deliberately unchanged cells. Success is not a new finding: it is
-live and offline deliverability agreeing to within a key or two, and the original
-"longer dwell delivers better" trend failing to reappear. That agreement is what
-licenses trusting runs 2–4. It also produces retained artifacts for a run whose
-originals were lost.
-
-**Run 2 — TX × dwell.** Dwell 2/4/8 s crossed with TX {+9 dBm, −24 dBm}. Resolves
+**Run 1 — TX × dwell.** Dwell 2/4/8 s crossed with TX {+9 dBm, −24 dBm}. Resolves
 the confound in the old TX × rotation run, every arm of which was attenuated, so
 its flat-TX finding covers only the attenuated tail while its large rotation
 effect may not be a dwell effect at all. The larger purpose is to establish
 attenuation as a **dial for leaving the delivery ceiling**, since no parameter is
 measurable while everything delivers.
+
+It leads the series because it carries the most value and depends on the least:
+deliverability comes from the offline resweep, which is immune to poller
+behaviour, so its headline result does not wait on run 2's verdict. It is also
+the harder test of the standard instrument block — ~13 keys/min against run 2's
+~5 — so a problem with the larger queue cap surfaces on the first night rather
+than the third.
 
 *Antenna protocol.* The directional antenna cannot be switched under program
 control, so it is a between-run block. Run both files back to back on one night,
@@ -101,18 +101,28 @@ time-of-night instead of confounded with it. The `txdbm` axis inside each run is
 interleaved and clean on its own; the anchors measure what the antenna itself is
 worth, since the same reference condition runs in both states.
 
+**Run 2 — replication.** Re-asks the project's first question with the fixed
+instrument, on deliberately unchanged cells. Success is not a new finding: it is
+live and offline deliverability agreeing to within a key or two, and the original
+"longer dwell delivers better" trend failing to reappear. It also produces
+retained artifacts for a run whose originals were lost. Running it second rather
+than first costs little — every run's deliverability comes from the resweep
+regardless, so what this validates is the interpretation of the *live* series and
+the propagation figures, both of which can be re-read after the fact.
+
 **Run 3 — density.** 120 repeats of the anchor, back to back, ideally across a
 busy→quiet transition. Nothing varies but time, so deliverability variation is
-attributable to ambient density alone. Turns the anchors scattered through runs
-1, 2 and 4 into points on a density curve.
+attributable to ambient density alone. Turns the anchors scattered through the
+other runs into points on a density curve.
 
-**Run 4 — sub-4 s dwell.** Extends run 2's dwell axis down to 1 s on the same
-iso-broadcast footing. **Run it at whichever attenuation run 2 puts below the
+**Run 4 — sub-4 s dwell.** Extends run 1's dwell axis down to 1 s on the same
+iso-broadcast footing. **Run it at whichever attenuation run 1 puts below the
 ceiling** — at full power the dwell factorial already delivered 100% at 4 s, so a
-full-power pass is expected to stay flat and answer nothing. Together runs 2 and
-4 give dwell from 1 s to 8 s at one power setting. Note the key rate at 1 s dwell
-(~60/min) exceeds even the 256 cap, so propagation coverage drops at the
-short-dwell levels; deliverability is unaffected.
+full-power pass is expected to stay flat and answer nothing. Together runs 1 and
+4 give dwell from 1 s to 8 s at one power setting. The queue stays inside the
+256 cap here: it is fed by the block-average key rate (~17/min, since every block
+cycles all five dwell levels), not the instantaneous rate during the 1 s cells,
+and it drains at the ~158 s median detection time.
 
 ## Operating the series
 
@@ -151,16 +161,21 @@ night to it.
 
 ### Per night
 
-| Night | Matrices, in order | Wall |
-|---|---|---|
-| 1 | `throughput` | ~7.0 h |
-| 2 | `txpower_dwell_ant` → `txpower_dwell_noant` | ~5.9 h |
-| 3 | `txpower_dwell_noant` → `txpower_dwell_ant` | ~5.9 h |
-| 4 | `density` | ~5.6 h |
-| 5 | `dwell_low` | ~3.6 h |
+| Night | Matrices, in order | Antenna | Wall |
+|---|---|---|---|
+| 1 | `txpower_dwell_ant` → `txpower_dwell_noant` | fitted → **removed at the swap** | ~5.9 h |
+| 2 | `txpower_dwell_noant` → `txpower_dwell_ant` | removed → **refitted at the swap** | ~5.9 h |
+| 3 | `throughput` | fitted | ~7.0 h |
+| 4 | `density` | fitted | ~5.6 h |
+| 5 | `dwell_low` | fitted, unless run 1 says otherwise | ~3.6 h |
 
-Nights 2 and 3 are the same pair in reversed order; you swap the antenna once,
-between the two runs. Watch progress with `scripts/dashboard.py`. After each run:
+Nights 1 and 2 are the same pair in reversed order, and they stay **adjacent** so
+the crossover's two halves see similar ambient conditions — do not put another
+run between them. You swap the antenna once per night, between the two runs.
+Mark its orientation before the first removal and refit it identically, or the
+"fitted" anchors on later nights are measuring a different rig.
+
+Watch progress with `scripts/dashboard.py`. After each run:
 
 ```sh
 $PY scripts/resweep.py results/<run>/    # authoritative deliverability
@@ -171,18 +186,19 @@ $PY scripts/analyze.py  results/<run>/
 
 These are the two points where the series can branch, and both are load-bearing.
 
-**After night 1** — live and offline deliverability must agree to within a key or
-two, and the original "longer dwell delivers better" trend must fail to reappear.
-If they disagree, **stop**: the instrument is still lying and nights 2–5 would
-inherit the same bias. That agreement, not any new number, is night 1's product.
-
-**After night 3** — read which arm landed off the delivery ceiling and run night 5
+**After night 2** — read which arm landed off the delivery ceiling and run night 5
 at that attenuation. At full power the dwell factorial already delivered 100% at
 4 s dwell, so a full-power sub-4 s pass is expected to come back flat and answer
 nothing. If *neither* arm leaves the ceiling (possible — −24 dBm with the antenna
 removed may still be far too strong), night 5 as written is not worth running,
 and the honest next step is physical attenuation: an inline RF attenuator or
 characterised shielding, not the PA setting.
+
+**After night 3** — live and offline deliverability must agree to within a key or
+two, and the original "longer dwell delivers better" trend must fail to reappear.
+If they disagree, the instrument is still lying: **stop before nights 4–5**, and
+re-read the *propagation* figures from nights 1–2 with that in mind. Their
+deliverability stands either way, since it comes from the offline resweep.
 
 ### Do not
 
