@@ -27,3 +27,6 @@ uid.hex
 # the aggregates are large, run-specific, and re-derivable from the raw series.
 # Keep the whole directory out of version control.
 results/
+
+# Generated report (rebuild: pandoc espbench-report.md -o espbench-report.html --standalone --embed-resources --toc)
+report/*.html
