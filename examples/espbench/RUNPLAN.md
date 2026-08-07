@@ -56,6 +56,14 @@ matrix's design. They exist so that two nights are compared against a condition
 they *share* rather than assumed equivalent, and so a night with unusual ambient
 density announces itself instead of quietly biasing the contrast.
 
+The anchor is only a valid reference **within one antenna state** — the same cell
+transmitted without the directional antenna is physically a different condition.
+So the series has a **baseline state: antenna FITTED**. Runs 1, 3 and 4 and the
+`_ant` half of run 2 all sit in it and share one anchor chain; the `_noant` half
+is the single deliberate departure, and its anchors are what measure the
+antenna's own worth. Run anything else antenna-off and its anchors stop comparing
+to the rest of the series.
+
 The anchor is also the density probe's only cell, so run 3 is simultaneously the
 deep characterisation of the exact condition the other runs spot-check. Analyse
 anchors across runs first; then read each run's own contrast.
@@ -132,8 +140,9 @@ a night was unusual; they cannot tell you it was unusual because the board moved
 ### Before every run
 
 ```sh
-python3 run_matrix.py matrix.<name>.json --dry-run   # cell/mid mapping, no hardware
-python3 run_matrix.py matrix.smoke.json              # ~15-20 min
+PY=scripts/.venv/bin/python      # system python3 lacks pyserial/findmy
+$PY run_matrix.py matrix.<name>.json --dry-run   # cell/mid mapping, no hardware
+$PY run_matrix.py matrix.smoke.json              # ~15-20 min
 ```
 
 The smoke run opens with `a000_ref`, the series anchor, and it should come back
@@ -154,8 +163,8 @@ Nights 2 and 3 are the same pair in reversed order; you swap the antenna once,
 between the two runs. Watch progress with `scripts/dashboard.py`. After each run:
 
 ```sh
-python3 scripts/resweep.py results/<run>/    # authoritative deliverability
-python3 scripts/analyze.py  results/<run>/
+$PY scripts/resweep.py results/<run>/    # authoritative deliverability
+$PY scripts/analyze.py  results/<run>/
 ```
 
 ### Decision gates
