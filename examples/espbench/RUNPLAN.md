@@ -232,6 +232,52 @@ transcribed from published numbers instead of regenerated. Copy each run
 directory off this machine when it finishes — the JSON and CSV are a couple of MB
 per run and cost 3–7 h of wall time to reproduce.
 
+## Results, and what they changed
+
+Kept here because `results/` is gitignored — the run directories hold the full
+`FINDINGS.md`, but this is the version-controlled record.
+
+### Run 1 — TX × dwell, antenna fitted (2026-08-07)
+
+`results/txpower_dwell_ant_20260807T043442Z`. 1960 keys, offline resweep.
+
+| | dwell 2 s | 4 s | 8 s | row |
+|---|---|---|---|---|
+| **+9 dBm** | 96.3% | 94.7% | 97.3% | **96.1%** |
+| **−24 dBm** | 90.0% | 88.0% | 89.0% | **89.0%** |
+
+Anchors 159/160 = 99.4%. TX contrast **+7.1 points, p = 0.0009** (cell-clustered
+permutation). Dwell flat at both power levels. A 4.9 min network outage at the
+start inflates propagation for 4 cells (see the run's `OUTAGE.md`);
+deliverability is unaffected.
+
+**TX power matters** — the old "TX power is nothing" was scoped to −12…−24 dBm,
+all of it attenuated, and the effect appears as soon as a full-power arm exists.
+
+**Dwell does not** — flat even at −24 dBm, where 11 points of headroom exist for
+an effect. The old run's 80/92/99% "rotation effect" held `adv` at 2000 ms, so
+its rotation levels were also 2/4/8 **broadcasts per key**; this design holds
+broadcasts at 5. The effect the project has attributed to dwell since the
+beginning is most plausibly broadcast count. The anchors say the same from inside
+the run: same power and dwell, 8 broadcasts → 99.4%, 5 broadcasts → 97.3%.
+
+**Changes this forces:**
+
+- **The standard 5-broadcasts/key axis is not a ceiling condition even at full
+  power** (96.1% vs the anchors' 99.4%). Good for sensitivity, but results on this
+  axis are *not* directly comparable to the earlier 99.5–99.9% runs, which ran at
+  8–80 broadcasts per key. **Compare through the anchors, never directly.**
+- **`matrix.dwell_low.json` needs `tx_power_dbm: -24` added before night 5.** It
+  currently sets no power, so it would run at the firmware default and sit near
+  the ceiling — the flat, uninformative outcome the run is designed to avoid.
+  Hold until night 2 confirms −24 dBm beats antenna-off as the operating point.
+- **A broadcasts × power matrix is now the highest-value experiment not yet
+  written**, since broadcast count has become the leading explanation for the
+  project's oldest headline finding.
+- Run 1 gives **no** independent live-vs-offline check — they agreed exactly,
+  which is expected since the slow sweep does what the resweep does. That
+  validation still belongs to night 3.
+
 ## Retained from the earlier corpus
 
 `matrix.advertising.json`, `matrix.dwell_isobroadcast.json` and

@@ -480,6 +480,17 @@ never from the live poller's detection counts.**
 
 ### TX-power × rotation sweep — rotation is everything, TX power is nothing
 
+> **Superseded 2026-08-07 — both halves of this heading are wrong.** A
+> controlled TX × dwell run (`RUNPLAN.md` § Results) found **TX power does
+> matter**: +9 dBm delivered 96.1% against −24 dBm's 89.0% (p = 0.0009). This
+> run saw flatness only because every one of its arms was attenuated
+> (−12…−24 dBm), with no full-power reference. And **dwell was flat** in that
+> run at both power levels, so the large rotation effect below is most
+> plausibly a *broadcasts-per-key* effect: `adv` was pinned at 2000 ms here,
+> so 4/8/16 s rotation was simultaneously 2/4/8 broadcasts per key. Read the
+> numbers below as sound measurements of a confounded design.
+
+
 **Parameters.** 120 cells, **2000 ms** advertising interval, 20 windows each,
 crossing two independent variables: **TX power** at the low tail of the radio —
 **−12/−15/−18/−21/−24 dBm** (−24 dBm is the hardware floor) — against **rotation
