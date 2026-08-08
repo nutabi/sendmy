@@ -1,0 +1,1128 @@
+{
+  "port": "/dev/cu.usbmodem101",
+  "settle_seconds": 900,
+  "report_floor_skew_s": 120,
+  "mid_gap": 100,
+  "deliver_window_s": null,
+  "detection": {
+    "poll": true,
+    "poll_interval_s": 30,
+    "detections_before_remove": 1,
+    "fast_timeout_s": 600,
+    "sweep_interval_s": 900,
+    "sweep_max_passes": 4,
+    "queue_soft_cap": 256
+  },
+  "density": {
+    "enabled": true,
+    "interval_s": 30,
+    "window_s": 10
+  },
+  "_note": "RUN 6 -- SETTLES THE 300 ms COMB. ANTENNA FITTED, -24 dBm.\n\nRun 4 (3360 keys, adv 200-1400 in 100 ms steps x broadcasts {4,6}) found delivery\ncollapses at every adv that is a multiple of 300: 69.3% vs 92.7%, p = 0.00005,\nat the same adv in both broadcast arms. That rules out dwell. The leading model is\nphase locking against a duty-cycled scanner with scan interval S: an advertiser\nvisits S/gcd(adv,S) distinct phases, and adv = k*S visits exactly one, so a phase\nin the scanner's dead time is never escaped. S = 300 ms fits all 13 levels.\n\nThis run attacks the two things run 4 could not settle.\n\nARM A -- off-grid adv {150, 250, 350, 450} at broadcasts {4, 6}.\nRun 4's 100 ms grid forced gcd(adv,300) to be 100 or 300, so it could only\ndistinguish 1 phase from 3 and could not show a GRADIENT. Predictions if S = 300:\n  adv 250, 350 -> gcd  50 -> 6 phases -> cleanest cells in the matrix\n  adv 150      -> gcd 150 -> 2 phases -> INTERMEDIATE, between locked and clean\n  adv 450      -> gcd 150 -> 2 phases -> intermediate\nadv 450 is also the discriminator against S = 150: under S = 150 it is a multiple\nof the scan interval and should be FULLY locked (severe), not intermediate. One\nlevel separates the two candidate scan intervals.\n\nARM B -- escape curve. adv 600 (locked) against adv 500 (clean control), each at\nbroadcasts {4, 8, 16}. This is the most consequential comparison in the run.\nThe spec's 0-10 ms random advDelay per advertising event gives phase a slow random\nwalk, so more events = more chances to escape a dead phase; run 4 already shows 6\nbroadcasts beating 4 at exactly the penalised levels and nowhere else. If that\nmechanism is real the penalty at adv 600 should largely VANISH by 16 broadcasts,\nand the rule becomes 'avoid multiples of 300 ms below ~8 broadcasts per key'.\nIf the penalty PERSISTS at 16 broadcasts, advDelay is not doing its job on this\ncontroller and the finding is a property of THIS TRANSMITTER rather than of the\nrelay network -- which is currently the largest open question in the report.\nRun 2 gives the ceiling for arm B: at -24 dBm, 16 broadcasts delivered 100%, so\nany shortfall at adv 600 / bc 16 is the comb and nothing else. Run 4 supplies the\nbc 4 point at adv 600 (59.2%) and 500 (92.5%); both are replicated here in-run.\n\nDESIGN. 14 conditions x 9 reps + 12 anchors. Condition order rotates by stride 5\nper block (coprime with 14, so every condition visits every slot). Anchors open\nevery block and bisect blocks 2, 5 and 8.\n\nANALYSIS. Group by (adv, broadcasts). Arm A: test for a graded response ordered\nby phases-visited = 300/gcd(adv,300), not a binary one. Arm B: test the adv 600\nvs adv 500 gap at each broadcast count -- the prediction is that the gap shrinks\nmonotonically and is near zero at 16.\n\nRESWEEP AT LEAST 2 h AFTER TRANSMIT ENDS. Run 4's first sweep ran ~1 min after\nthe last cell and read 29.6% for that final hour against 76.1% on re-sweep.",
+  "cells": [
+    {
+      "name": "a000_ref",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s000_b04_a0150",
+      "mode": "incremental",
+      "adv_interval_ms": 150,
+      "update_interval_ms": 600,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s001_b06_a0350",
+      "mode": "incremental",
+      "adv_interval_ms": 350,
+      "update_interval_ms": 2100,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s002_b16_a0500",
+      "mode": "incremental",
+      "adv_interval_ms": 500,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s003_b06_a0150",
+      "mode": "incremental",
+      "adv_interval_ms": 150,
+      "update_interval_ms": 900,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s004_b04_a0450",
+      "mode": "incremental",
+      "adv_interval_ms": 450,
+      "update_interval_ms": 1800,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s005_b04_a0600",
+      "mode": "incremental",
+      "adv_interval_ms": 600,
+      "update_interval_ms": 2400,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s006_b04_a0250",
+      "mode": "incremental",
+      "adv_interval_ms": 250,
+      "update_interval_ms": 1000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s007_b06_a0450",
+      "mode": "incremental",
+      "adv_interval_ms": 450,
+      "update_interval_ms": 2700,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s008_b08_a0600",
+      "mode": "incremental",
+      "adv_interval_ms": 600,
+      "update_interval_ms": 4800,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s009_b06_a0250",
+      "mode": "incremental",
+      "adv_interval_ms": 250,
+      "update_interval_ms": 1500,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s010_b04_a0500",
+      "mode": "incremental",
+      "adv_interval_ms": 500,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s011_b16_a0600",
+      "mode": "incremental",
+      "adv_interval_ms": 600,
+      "update_interval_ms": 9600,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s012_b04_a0350",
+      "mode": "incremental",
+      "adv_interval_ms": 350,
+      "update_interval_ms": 1400,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s013_b08_a0500",
+      "mode": "incremental",
+      "adv_interval_ms": 500,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "a001_ref",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s014_b06_a0150",
+      "mode": "incremental",
+      "adv_interval_ms": 150,
+      "update_interval_ms": 900,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s015_b04_a0450",
+      "mode": "incremental",
+      "adv_interval_ms": 450,
+      "update_interval_ms": 1800,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s016_b04_a0600",
+      "mode": "incremental",
+      "adv_interval_ms": 600,
+      "update_interval_ms": 2400,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s017_b04_a0250",
+      "mode": "incremental",
+      "adv_interval_ms": 250,
+      "update_interval_ms": 1000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s018_b06_a0450",
+      "mode": "incremental",
+      "adv_interval_ms": 450,
+      "update_interval_ms": 2700,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s019_b08_a0600",
+      "mode": "incremental",
+      "adv_interval_ms": 600,
+      "update_interval_ms": 4800,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s020_b06_a0250",
+      "mode": "incremental",
+      "adv_interval_ms": 250,
+      "update_interval_ms": 1500,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "a002_ref",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s021_b04_a0500",
+      "mode": "incremental",
+      "adv_interval_ms": 500,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s022_b16_a0600",
+      "mode": "incremental",
+      "adv_interval_ms": 600,
+      "update_interval_ms": 9600,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s023_b04_a0350",
+      "mode": "incremental",
+      "adv_interval_ms": 350,
+      "update_interval_ms": 1400,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s024_b08_a0500",
+      "mode": "incremental",
+      "adv_interval_ms": 500,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s025_b04_a0150",
+      "mode": "incremental",
+      "adv_interval_ms": 150,
+      "update_interval_ms": 600,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s026_b06_a0350",
+      "mode": "incremental",
+      "adv_interval_ms": 350,
+      "update_interval_ms": 2100,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s027_b16_a0500",
+      "mode": "incremental",
+      "adv_interval_ms": 500,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "a003_ref",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s028_b04_a0250",
+      "mode": "incremental",
+      "adv_interval_ms": 250,
+      "update_interval_ms": 1000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s029_b06_a0450",
+      "mode": "incremental",
+      "adv_interval_ms": 450,
+      "update_interval_ms": 2700,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s030_b08_a0600",
+      "mode": "incremental",
+      "adv_interval_ms": 600,
+      "update_interval_ms": 4800,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s031_b06_a0250",
+      "mode": "incremental",
+      "adv_interval_ms": 250,
+      "update_interval_ms": 1500,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s032_b04_a0500",
+      "mode": "incremental",
+      "adv_interval_ms": 500,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s033_b16_a0600",
+      "mode": "incremental",
+      "adv_interval_ms": 600,
+      "update_interval_ms": 9600,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s034_b04_a0350",
+      "mode": "incremental",
+      "adv_interval_ms": 350,
+      "update_interval_ms": 1400,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s035_b08_a0500",
+      "mode": "incremental",
+      "adv_interval_ms": 500,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s036_b04_a0150",
+      "mode": "incremental",
+      "adv_interval_ms": 150,
+      "update_interval_ms": 600,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s037_b06_a0350",
+      "mode": "incremental",
+      "adv_interval_ms": 350,
+      "update_interval_ms": 2100,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s038_b16_a0500",
+      "mode": "incremental",
+      "adv_interval_ms": 500,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s039_b06_a0150",
+      "mode": "incremental",
+      "adv_interval_ms": 150,
+      "update_interval_ms": 900,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s040_b04_a0450",
+      "mode": "incremental",
+      "adv_interval_ms": 450,
+      "update_interval_ms": 1800,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s041_b04_a0600",
+      "mode": "incremental",
+      "adv_interval_ms": 600,
+      "update_interval_ms": 2400,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "a004_ref",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s042_b06_a0250",
+      "mode": "incremental",
+      "adv_interval_ms": 250,
+      "update_interval_ms": 1500,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s043_b04_a0500",
+      "mode": "incremental",
+      "adv_interval_ms": 500,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s044_b16_a0600",
+      "mode": "incremental",
+      "adv_interval_ms": 600,
+      "update_interval_ms": 9600,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s045_b04_a0350",
+      "mode": "incremental",
+      "adv_interval_ms": 350,
+      "update_interval_ms": 1400,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s046_b08_a0500",
+      "mode": "incremental",
+      "adv_interval_ms": 500,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s047_b04_a0150",
+      "mode": "incremental",
+      "adv_interval_ms": 150,
+      "update_interval_ms": 600,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s048_b06_a0350",
+      "mode": "incremental",
+      "adv_interval_ms": 350,
+      "update_interval_ms": 2100,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s049_b16_a0500",
+      "mode": "incremental",
+      "adv_interval_ms": 500,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s050_b06_a0150",
+      "mode": "incremental",
+      "adv_interval_ms": 150,
+      "update_interval_ms": 900,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s051_b04_a0450",
+      "mode": "incremental",
+      "adv_interval_ms": 450,
+      "update_interval_ms": 1800,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s052_b04_a0600",
+      "mode": "incremental",
+      "adv_interval_ms": 600,
+      "update_interval_ms": 2400,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s053_b04_a0250",
+      "mode": "incremental",
+      "adv_interval_ms": 250,
+      "update_interval_ms": 1000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s054_b06_a0450",
+      "mode": "incremental",
+      "adv_interval_ms": 450,
+      "update_interval_ms": 2700,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s055_b08_a0600",
+      "mode": "incremental",
+      "adv_interval_ms": 600,
+      "update_interval_ms": 4800,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "a005_ref",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s056_b04_a0350",
+      "mode": "incremental",
+      "adv_interval_ms": 350,
+      "update_interval_ms": 1400,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s057_b08_a0500",
+      "mode": "incremental",
+      "adv_interval_ms": 500,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s058_b04_a0150",
+      "mode": "incremental",
+      "adv_interval_ms": 150,
+      "update_interval_ms": 600,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s059_b06_a0350",
+      "mode": "incremental",
+      "adv_interval_ms": 350,
+      "update_interval_ms": 2100,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s060_b16_a0500",
+      "mode": "incremental",
+      "adv_interval_ms": 500,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s061_b06_a0150",
+      "mode": "incremental",
+      "adv_interval_ms": 150,
+      "update_interval_ms": 900,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s062_b04_a0450",
+      "mode": "incremental",
+      "adv_interval_ms": 450,
+      "update_interval_ms": 1800,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "a006_ref",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s063_b04_a0600",
+      "mode": "incremental",
+      "adv_interval_ms": 600,
+      "update_interval_ms": 2400,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s064_b04_a0250",
+      "mode": "incremental",
+      "adv_interval_ms": 250,
+      "update_interval_ms": 1000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s065_b06_a0450",
+      "mode": "incremental",
+      "adv_interval_ms": 450,
+      "update_interval_ms": 2700,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s066_b08_a0600",
+      "mode": "incremental",
+      "adv_interval_ms": 600,
+      "update_interval_ms": 4800,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s067_b06_a0250",
+      "mode": "incremental",
+      "adv_interval_ms": 250,
+      "update_interval_ms": 1500,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s068_b04_a0500",
+      "mode": "incremental",
+      "adv_interval_ms": 500,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s069_b16_a0600",
+      "mode": "incremental",
+      "adv_interval_ms": 600,
+      "update_interval_ms": 9600,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "a007_ref",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s070_b06_a0350",
+      "mode": "incremental",
+      "adv_interval_ms": 350,
+      "update_interval_ms": 2100,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s071_b16_a0500",
+      "mode": "incremental",
+      "adv_interval_ms": 500,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s072_b06_a0150",
+      "mode": "incremental",
+      "adv_interval_ms": 150,
+      "update_interval_ms": 900,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s073_b04_a0450",
+      "mode": "incremental",
+      "adv_interval_ms": 450,
+      "update_interval_ms": 1800,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s074_b04_a0600",
+      "mode": "incremental",
+      "adv_interval_ms": 600,
+      "update_interval_ms": 2400,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s075_b04_a0250",
+      "mode": "incremental",
+      "adv_interval_ms": 250,
+      "update_interval_ms": 1000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s076_b06_a0450",
+      "mode": "incremental",
+      "adv_interval_ms": 450,
+      "update_interval_ms": 2700,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s077_b08_a0600",
+      "mode": "incremental",
+      "adv_interval_ms": 600,
+      "update_interval_ms": 4800,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s078_b06_a0250",
+      "mode": "incremental",
+      "adv_interval_ms": 250,
+      "update_interval_ms": 1500,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s079_b04_a0500",
+      "mode": "incremental",
+      "adv_interval_ms": 500,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s080_b16_a0600",
+      "mode": "incremental",
+      "adv_interval_ms": 600,
+      "update_interval_ms": 9600,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s081_b04_a0350",
+      "mode": "incremental",
+      "adv_interval_ms": 350,
+      "update_interval_ms": 1400,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s082_b08_a0500",
+      "mode": "incremental",
+      "adv_interval_ms": 500,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s083_b04_a0150",
+      "mode": "incremental",
+      "adv_interval_ms": 150,
+      "update_interval_ms": 600,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "a008_ref",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s084_b04_a0450",
+      "mode": "incremental",
+      "adv_interval_ms": 450,
+      "update_interval_ms": 1800,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s085_b04_a0600",
+      "mode": "incremental",
+      "adv_interval_ms": 600,
+      "update_interval_ms": 2400,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s086_b04_a0250",
+      "mode": "incremental",
+      "adv_interval_ms": 250,
+      "update_interval_ms": 1000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s087_b06_a0450",
+      "mode": "incremental",
+      "adv_interval_ms": 450,
+      "update_interval_ms": 2700,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s088_b08_a0600",
+      "mode": "incremental",
+      "adv_interval_ms": 600,
+      "update_interval_ms": 4800,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s089_b06_a0250",
+      "mode": "incremental",
+      "adv_interval_ms": 250,
+      "update_interval_ms": 1500,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s090_b04_a0500",
+      "mode": "incremental",
+      "adv_interval_ms": 500,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s091_b16_a0600",
+      "mode": "incremental",
+      "adv_interval_ms": 600,
+      "update_interval_ms": 9600,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s092_b04_a0350",
+      "mode": "incremental",
+      "adv_interval_ms": 350,
+      "update_interval_ms": 1400,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s093_b08_a0500",
+      "mode": "incremental",
+      "adv_interval_ms": 500,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s094_b04_a0150",
+      "mode": "incremental",
+      "adv_interval_ms": 150,
+      "update_interval_ms": 600,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s095_b06_a0350",
+      "mode": "incremental",
+      "adv_interval_ms": 350,
+      "update_interval_ms": 2100,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s096_b16_a0500",
+      "mode": "incremental",
+      "adv_interval_ms": 500,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s097_b06_a0150",
+      "mode": "incremental",
+      "adv_interval_ms": 150,
+      "update_interval_ms": 900,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "a009_ref",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s098_b06_a0450",
+      "mode": "incremental",
+      "adv_interval_ms": 450,
+      "update_interval_ms": 2700,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s099_b08_a0600",
+      "mode": "incremental",
+      "adv_interval_ms": 600,
+      "update_interval_ms": 4800,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s100_b06_a0250",
+      "mode": "incremental",
+      "adv_interval_ms": 250,
+      "update_interval_ms": 1500,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s101_b04_a0500",
+      "mode": "incremental",
+      "adv_interval_ms": 500,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s102_b16_a0600",
+      "mode": "incremental",
+      "adv_interval_ms": 600,
+      "update_interval_ms": 9600,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s103_b04_a0350",
+      "mode": "incremental",
+      "adv_interval_ms": 350,
+      "update_interval_ms": 1400,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s104_b08_a0500",
+      "mode": "incremental",
+      "adv_interval_ms": 500,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "a010_ref",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s105_b04_a0150",
+      "mode": "incremental",
+      "adv_interval_ms": 150,
+      "update_interval_ms": 600,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s106_b06_a0350",
+      "mode": "incremental",
+      "adv_interval_ms": 350,
+      "update_interval_ms": 2100,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s107_b16_a0500",
+      "mode": "incremental",
+      "adv_interval_ms": 500,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s108_b06_a0150",
+      "mode": "incremental",
+      "adv_interval_ms": 150,
+      "update_interval_ms": 900,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s109_b04_a0450",
+      "mode": "incremental",
+      "adv_interval_ms": 450,
+      "update_interval_ms": 1800,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s110_b04_a0600",
+      "mode": "incremental",
+      "adv_interval_ms": 600,
+      "update_interval_ms": 2400,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s111_b04_a0250",
+      "mode": "incremental",
+      "adv_interval_ms": 250,
+      "update_interval_ms": 1000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "a011_ref",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s112_b04_a0500",
+      "mode": "incremental",
+      "adv_interval_ms": 500,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s113_b16_a0600",
+      "mode": "incremental",
+      "adv_interval_ms": 600,
+      "update_interval_ms": 9600,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s114_b04_a0350",
+      "mode": "incremental",
+      "adv_interval_ms": 350,
+      "update_interval_ms": 1400,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s115_b08_a0500",
+      "mode": "incremental",
+      "adv_interval_ms": 500,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s116_b04_a0150",
+      "mode": "incremental",
+      "adv_interval_ms": 150,
+      "update_interval_ms": 600,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s117_b06_a0350",
+      "mode": "incremental",
+      "adv_interval_ms": 350,
+      "update_interval_ms": 2100,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s118_b16_a0500",
+      "mode": "incremental",
+      "adv_interval_ms": 500,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s119_b06_a0150",
+      "mode": "incremental",
+      "adv_interval_ms": 150,
+      "update_interval_ms": 900,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s120_b04_a0450",
+      "mode": "incremental",
+      "adv_interval_ms": 450,
+      "update_interval_ms": 1800,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s121_b04_a0600",
+      "mode": "incremental",
+      "adv_interval_ms": 600,
+      "update_interval_ms": 2400,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s122_b04_a0250",
+      "mode": "incremental",
+      "adv_interval_ms": 250,
+      "update_interval_ms": 1000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s123_b06_a0450",
+      "mode": "incremental",
+      "adv_interval_ms": 450,
+      "update_interval_ms": 2700,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s124_b08_a0600",
+      "mode": "incremental",
+      "adv_interval_ms": 600,
+      "update_interval_ms": 4800,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s125_b06_a0250",
+      "mode": "incremental",
+      "adv_interval_ms": 250,
+      "update_interval_ms": 1500,
+      "count": 20,
+      "tx_power_dbm": -24
+    }
+  ]
+}
