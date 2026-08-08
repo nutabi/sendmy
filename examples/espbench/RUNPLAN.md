@@ -2,8 +2,8 @@
 
 A series rather than a set of experiments: each run answers the question the
 previous one raised, and all are measured the same way so their results sit on
-the same axes. Runs 1, 1b, 2 and 3 are complete (all on 2026-08-07/08); run 4
-remains, and needs a location the others did not.
+the same axes. Runs 1, 1b, 2 and 3 are complete (all on 2026-08-07/08). Run 4
+chases the anomaly run 3 turned up; run 5 needs a location the others did not.
 
 ## What makes them comparable
 
@@ -52,8 +52,9 @@ same thing across runs and can be plotted continuously from 1 s to 8 s.
 dwell sweep — and run 3 found a 22.6-point penalty that tracks `adv` (600 and
 1200 ms bad; 200, 400, 800 ms fine) rather than dwell. The convention is still
 right for isolating dwell from broadcast count, but **`adv` is now a known latent
-covariate in every dwell sweep**, and a fine `adv` sweep at fixed dwell and fixed
-broadcasts is needed to characterise it.
+covariate in every dwell sweep**. Run 4 characterises it — and note that
+"fixed dwell and fixed broadcasts" is not a design that exists, since
+`broadcasts = dwell/adv` fixes the third whenever two are set.
 
 **3. One anchor condition.** Cells named `a###_ref` are the shared reference:
 `incremental`, adv 1 s, 8 s dwell, 20 windows, +9 dBm. One opens every run and
@@ -64,7 +65,7 @@ density announces itself instead of quietly biasing the contrast.
 
 The anchor is only a valid reference **within one antenna state** — the same cell
 transmitted without the directional antenna is physically a different condition.
-So the series has a **baseline state: antenna FITTED**. Runs 1, 2, 3 and 4 all sit
+So the series has a **baseline state: antenna FITTED**. Every run but 1b sits
 in it and share one anchor chain; run 1b is the single deliberate departure, and
 its anchors are what measured the antenna's own worth. Run anything else
 antenna-off and its anchors stop comparing to the rest of the series.
@@ -84,7 +85,8 @@ own contrast.
 | 1b | `matrix.txpower_dwell_noant.json` (+ `_resume`) | 2.7 h | Can antenna removal serve as an attenuation dial? | **done** — answer: no |
 | 2 | `matrix.broadcasts.json` (+ `_resume`) | 2.8 h | Dwell or broadcast count? | **done** — answer: broadcast count |
 | 3 | `matrix.dwell_low.json` | 4.5 h | Is there a dwell floor below 4 s? | **done** — answer: no, but `adv` bands found |
-| 4 | `matrix.density.json` | ~6 h | Does the broadcast rule hold as the city empties? |  |
+| 4 | `matrix.advsweep.json` | ~4.9 h | Is the run-3 penalty a property of `adv` or of dwell? |  |
+| 5 | `matrix.density.json` | ~6 h | Does the broadcast rule hold as the city empties? | needs a new location |
 | — | `matrix.throughput.json` | ~6.8 h | **Dropped** — see below |  |
 
 Numbering follows what was actually run, not the original plan. Add
@@ -119,7 +121,35 @@ this — it pinned dwell at 4000 ms throughout. The queue stays inside the 256 c
 it is fed by the block-average key rate (~17/min, since every block cycles all
 five dwell levels), not the instantaneous rate during the 1 s cells.
 
-**Run 4 — density.** Ideally across a busy→quiet transition, with nothing varying
+**Run 4 — fine `adv` sweep.** `adv` 200…1400 ms in 100 ms steps at −24 dBm,
+crossed with **two** broadcast levels, 4 and 6. Characterises the 22.6-point
+penalty run 3 found at `adv` 600 and 1200 ms.
+
+*Why two broadcast levels, and why not "fixed dwell and fixed broadcasts".*
+`broadcasts = dwell / adv`, so only two of the three can ever be fixed — the
+sweep I first described is not constructible. Fixing dwell would make broadcasts
+vary, and broadcast count is the largest effect in the series (42.8% → 97.2% in
+run 2); it would swamp everything. So broadcasts are pinned and run at two
+levels, which is what separates the two explanations run 3 could not tell apart:
+
+- if the penalty tracks **`adv`**, it appears at the *same* `adv` in both arms
+- if it tracks **dwell**, it appears at *different* `adv` in each arm, since
+  dwell is 4·`adv` in one and 6·`adv` in the other
+
+Both levels sit below the ceiling at −24 dBm (run 2: 83.3% and ~90%), so there is
+headroom in both directions. Resulting dwell spans 800–8400 ms, and dwell is an
+established null across 1000–8000 ms from runs 1 and 3, so it enters as a
+known-inert covariate rather than a rival factor.
+
+100 ms sampling also tests the mechanism. If the cause is BLE channel aliasing,
+the penalty should be **periodic** in `adv` rather than a single band — structure
+that run 3's five coarse points could not have seen.
+
+168 cells / 3360 keys, anchors opening and bisecting every block. With a
+22-point effect to confirm, the anchors are the only thing separating a real band
+from an unusual hour.
+
+**Run 5 — density.** Ideally across a busy→quiet transition, with nothing varying
 but time, so deliverability variation is attributable to ambient density alone.
 **The original design is void and has been rebuilt.** It was 120 repeats of the
 anchor — 8 broadcasts at +9 dBm — which run 2 measured at 100.0%; every cell
@@ -198,7 +228,8 @@ night to it.
 | Night | Matrices, in order | Antenna | Wall | |
 |---|---|---|---|---|
 | 1 | `txpower_dwell_ant` → `txpower_dwell_noant` (+ `_resume`) → `broadcasts` (+ `_resume`) → `dwell_low` | fitted → removed → refitted | ~18 h | **done** 2026-08-07/08 |
-| 2 | `density` | fitted | ~6.5 h | needs a location with real footfall — see below |
+| 2 | `advsweep` | fitted | ~5.4 h | |
+| 3 | `density` | fitted | ~6.5 h | needs a location with real footfall — see below |
 
 Everything through run 3 landed on one long night. The planned crossover
 (nights 1 and 2 as the same pair reversed) was **abandoned**: run 1b showed
