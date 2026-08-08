@@ -15,8 +15,8 @@ key, and the sender's owner fetches those reports back. This report
 characterises that channel experimentally — how much gets through, how fast, and
 which transmitter parameters matter.
 
-Ten automated matrix runs on an ESP32 (~22,000 transmitted keys, single urban
-site) support five findings:
+Eleven automated matrix runs on an ESP32 — 24,337 transmitted keys at a single
+urban site — support five findings:
 
 1. **The channel is effectively lossless at urban density and full transmit
    power.** Ground-truth deliverability was 99.5%, 99.8% and 99.94% across three
@@ -27,10 +27,14 @@ site) support five findings:
    dwell from 1 s to 8 s is flat at two different power levels.
 3. **Transmit power sets where that curve saturates**, rather than shifting
    delivery uniformly: +9 dBm reaches 98% by two broadcasts; −24 dBm needs eight.
-4. **Some advertising intervals are simply bad.** Delivery collapses at every
-   interval that is a **multiple of 300 ms** — 69.3% against 92.7% elsewhere
-   (p = 0.00005) — in a comb that a coarse sweep steps straight over. The
-   leading explanation is phase locking against a duty-cycled scanner.
+4. **Some advertising intervals are simply bad, and more broadcasts do not fix
+   them.** Delivery collapses at every interval that is a **multiple of 300 ms**
+   — 69.3% against 92.7% elsewhere (p = 0.00005) — in a comb that a coarse sweep
+   steps straight over. Delivery is set by how many distinct phases of a 300 ms
+   cycle the advertiser reaches, `300 / gcd(adv, 300)`, and a locked interval is
+   still 22 points below its control at 16 broadcasts per key (p = 0.001). Read
+   the other way, this is a measurement of the **relay scanner's duty cycle**
+   inferred entirely from delivery statistics.
 5. **The channel's real cost is latency, not loss** — median 158 s from
    transmission to a fetchable report, p90 355 s, with a tail past 9 minutes.
    More broadcasts also buy latency: 4× more moved the median 40 s earlier.
@@ -98,11 +102,12 @@ with no queue pressure and a generous time window.
 | 2. Broadcasts × TX | 99 × 20 = 1980 | broadcasts 1/2/4/8/16 × TX {+9, −24 dBm} | ~2.8 h |
 | 3. Sub-4 s dwell | 165 × 20 = 3300 | dwell 1/2/3/4/6 s @ −24 dBm | ~4.5 h |
 | 4. Fine `adv` sweep | 168 × 20 = 3360 | adv 200…1400 ms × broadcasts {4, 6} @ −24 dBm | ~4.9 h |
+| 6. Comb follow-up | 138 × 20 = 2760 | off-grid adv {150…450} × {4, 6}; adv {500, 600} × {4, 8, 16} | ~2.7 h |
 
 Runs A–E are the exploratory corpus; runs 1–4 are a controlled **series** sharing
 one instrument configuration and a common anchor condition (`a###_ref`,
 ~7–10% of every run), which is what makes them comparable across nights. Anchors
-read 99.4 / 99.4 / 100.0 / 99.6% in runs 1–4 — the instrument check that licenses
+read 99.4 / 99.4 / 100.0 / 99.6 / 100.0% in runs 1–4 and 6 — the instrument check that licenses
 pooling. Runs 1b, 2, 3 and 4 are the only ones with a full-power *and* an
 attenuated arm, and that headroom is why they can see effects that runs A–E,
 saturated at ceiling, could not.
@@ -150,7 +155,7 @@ power every condition sat at ceiling. Run 2 re-ran the question with headroom:
 dwell pinned at 4,000 ms throughout, broadcasts per key stepped 1 → 16 by
 varying `adv`, crossed with transmit power at {+9, −24 dBm}.
 
-![Deliverability against broadcasts per key at two transmit powers](assets/fig6-broadcast-delivery.svg)
+![Deliverability against broadcasts per key at two transmit powers](assets/fig1-broadcast-delivery.svg)
 
 *Figure 1 — At the −24 dBm power floor delivery climbs from 42.8% to 100% across
 the broadcast axis. At +9 dBm the same curve is already saturated by two
@@ -191,7 +196,7 @@ a 22.6-point gap at p < 0.0001. That design pinned `adv = dwell/5`, leaving the
 two perfectly confounded, so run 4 separated them: `adv` swept 200–1400 ms in
 100 ms steps, crossed with **two** broadcast counts, 4 and 6.
 
-![Deliverability against advertising interval at two broadcast counts](assets/fig1-adv-comb.svg)
+![Deliverability against advertising interval at two broadcast counts](assets/fig2-adv-comb.svg)
 
 *Figure 2 — The penalty is periodic, not a single resonance, and it lands at the
 same advertising intervals in both broadcast arms.*
@@ -238,21 +243,101 @@ else. And it contradicts nothing already measured: run C swept `adv` at
 over every bad interval by luck and concluded "duty cycle is nearly free" —
 true at those six intervals, false in general.
 
-**This is a hypothesis, not a finding**, and two things limit it. The 100 ms grid
-means `gcd(adv, 300)` is only ever 100 or 300, so the sweep distinguished
-"1 phase" from "3 phases" and could not measure a gradient. And an alternative
-reading is that the ESP32 controller's `advDelay` randomisation is weak or
-absent, which would make locking permanent rather than escapable — a property of
-this transmitter rather than of the relay network, which changes how far the
-result generalises. A test for overdispersion at penalised levels was
-inconclusive (3.03× binomial against 3.74× at clean levels), as expected once 20
-keys are pooled across many scanners with independent phases. §9 lists the three
-levels that would settle it.
+**Run 6 tested the model's two sharpest predictions and both held.** It swept
+`adv` off the 100 ms grid — 150, 250, 350, 450 ms — and separately walked
+broadcast count at one locked interval and one control. 138 cells / 2760 keys,
+anchors 240/240 = **100.0%**.
 
-**Practical rule, combined with §3: use at least 8 broadcasts per key, and never
-choose an advertising interval that is a multiple of 300 ms.** Neighbouring
-intervals are fine — 500 ms and 1100 ms both clear 92% at a broadcast count
-where 600 ms and 1200 ms fail.
+*Prediction 1: the response should be graded by phases visited, not binary.* Run
+4's grid forced `gcd(adv, 300)` to be 100 or 300, so it could only ever separate
+one phase from three. Run 6 contains all four phase counts internally, at a
+matched broadcast count:
+
+![Deliverability against phases visited](assets/fig3-phase-response.svg)
+
+| phases visited | 1 | 2 | 3 | 6 |
+|---|---|---|---|---|
+| `adv` (ms) | 600 | 150, 450 | 500 | 250, 350 |
+| delivered | 48.3% | 76.1% | 79.4% | **85.0%** |
+
+*Figure 3 — Monotone in phases visited and saturating between three and six.
+6-phase over 2-phase is +12.4 points, p = 0.0001.*
+
+*Prediction 2: 450 ms discriminates the scan interval.* Under `S` = 300 it visits
+2 phases and should be intermediate; under `S` = 150 it is a multiple of the scan
+interval and should be **fully locked**. It came back intermediate — 75.6%,
+alongside 150 ms at 78.9% — which favours a 300 ms cycle.
+
+**But the penalty does not escape with broadcast count**, and that changes the
+practical rule:
+
+![Deliverability against broadcasts at a locked and a clean interval](assets/fig4-escape-curve.svg)
+
+| broadcasts/key | 4 | 8 | 16 |
+|---|---|---|---|
+| `adv` 500 ms (3 phases) | 79.4% | 97.8% | **98.9%** |
+| `adv` 600 ms (1 phase) | 48.3% | 61.7% | **76.7%** |
+| gap | +31.1 | +36.1 | **+22.2** |
+
+*Figure 4 — The control reaches ceiling by 8 broadcasts; the locked interval is
+still 22 points short at 16 (p = 0.001).*
+
+This is consistent with the model rather than against it. The random walk from
+`advDelay` advances phase by ~5 ms per event on average, so 16 events buy roughly
+80 ms of drift against a ~300 ms cycle — sixty-odd events would be needed to
+traverse it. The escape is real but far slower than 16 broadcasts can deliver.
+**The consequence is that the broadcast-count rule and the advertising-interval
+rule are independent constraints: satisfying §3 does not rescue a locked
+interval.**
+
+### What this says about the relay scanner
+
+Read in reverse, these results are a measurement of the scanning devices —
+inferred entirely from delivery statistics, with no access to the phones.
+
+- **The scan schedule is periodic, with a 300 ms fundamental.** A comb requires a
+  clock; jittered scan starts would erase it.
+- **Scan phase is stable across the whole dwell**, up to ~10 s here. A scanner
+  re-randomising its offset each cycle would average out within a few events.
+- **The scanner population shares that cadence.** Around ten independent
+  strangers' devices were present. Heterogeneous scan intervals would make one
+  device's resonance another's drift and smear the comb away; its sharpness
+  implies a single OS-level schedule rather than per-app scanning.
+- **The scarce resource is scan *time*, not channel coverage.** A legacy
+  advertising event covers 37, 38 and 39 within milliseconds, so the bottleneck
+  can only be that the scanner is asleep most of the time.
+- **Phase offsets are distributed across devices, not aligned.** A fully locked
+  advertiser still delivers 48%; if every phone woke on a shared boundary it
+  would deliver near zero. A "locked" transmitter is only locked against the
+  subset of phones whose window it misses.
+- **The duty cycle is substantial, not tiny.** Coverage nearly saturates by three
+  phases. A window of a few percent of the interval would show a long climb from
+  3 to 6 phases; the plateau puts it at order tens of percent. No point estimate
+  is offered: delivery needs only one of ~10 phones to hear a key, so the map
+  from per-scanner hit probability to observed delivery saturates and cannot be
+  inverted without modelling the population.
+
+**What remains unproven.** 300 ms is the period of the resonance, not necessarily
+the scan interval — a 600 ms interval with two windows per cycle, or 150 ms with
+alternate windows skipped, would look identical from here. A weak `advDelay` on
+the ESP32 would deepen locking without creating it, so the transmitter is not
+fully excluded. And a test for overdispersion at penalised levels was
+inconclusive (3.03× binomial against 3.74× at clean levels), as expected once 20
+keys are pooled across scanners with independent phases. §9 gives the experiment
+that would pin the duty cycle rather than bound it.
+
+**Practical rule, combined with §3: use at least 8 broadcasts per key, *and*
+never choose an advertising interval that is a multiple of 300 ms.** These are
+independent requirements — run 6 shows raising broadcast count does not buy your
+way out of a bad interval. Neighbouring intervals are fine: 500 ms reaches 98.9%
+at the same broadcast count where 600 ms manages 76.7%.
+
+**One caveat on absolute numbers.** Run 6 ran sparser than run 4 (median 10
+finders against 16), and its `adv` 500 / 4-broadcast cell reads 79.4% against run
+4's 92.5% for the same condition, while anchors were 100% in both. The anchor
+condition is too strong to register a shift that moves fragile cells 13 points.
+Every claim above is a within-run contrast; cross-run absolute rates should not
+be quoted.
 
 ---
 
@@ -264,9 +349,9 @@ end-to-end delay, and it is the quantity a system built on `sendmy` must design
 around. The estimate below comes from run E alone — latency distributions from
 different runs are not comparable, for reasons given in §7.
 
-![Cumulative distribution of propagation delay, run E](assets/fig2-propagation-cdf.svg)
+![Cumulative distribution of propagation delay, run E](assets/fig5-propagation-cdf.svg)
 
-*Figure 3 — Propagation delay over the 1,522 run-E keys the poller timed.*
+*Figure 5 — Propagation delay over the 1,522 run-E keys the poller timed.*
 
 | min | p25 | **p50** | p75 | **p90** | p99 | max |
 |---|---|---|---|---|---|---|
@@ -304,9 +389,9 @@ iso-broadcast design. 15 replicates per condition, round-robin interleaved.
 Delivery, as §2 shows, was at ceiling in all six conditions, so the design could
 not discriminate on its primary endpoint. It discriminated cleanly on latency:
 
-![Median propagation delay by dwell and broadcast count](assets/fig3-factorial-dumbbell.svg)
+![Median propagation delay by dwell and broadcast count](assets/fig6-factorial-dumbbell.svg)
 
-*Figure 4 — At every dwell level, more broadcasts per key means a lower median
+*Figure 6 — At every dwell level, more broadcasts per key means a lower median
 propagation delay, while delivery stays pinned at the ceiling.*
 
 | | broadcasts = 5 | broadcasts = 20 |
@@ -319,9 +404,9 @@ propagation delay, while delivery stays pinned at the ceiling.*
   29 of 44 pairs favour the denser broadcast, mean Δ 43 s, **sign test
   p = 0.049**.
 
-![Replicate-matched paired differences](assets/fig4-paired-differences.svg)
+![Replicate-matched paired differences](assets/fig7-paired-differences.svg)
 
-*Figure 5 — The paired test in full. The effect is a shifted distribution, not a
+*Figure 7 — The paired test in full. The effect is a shifted distribution, not a
 uniform one: 15 of 44 pairs run the other way, and the mean is carried partly by
 a long positive tail.*
 
@@ -364,9 +449,9 @@ deliverability, rising monotonically with dwell:
 | 18 s | 44.8% | 100% |
 | **all** | **40.0%** | **99.5%** |
 
-![Live poller versus offline resweep deliverability](assets/fig5-live-vs-offline.svg)
+![Live poller versus offline resweep deliverability](assets/fig8-live-vs-offline.svg)
 
-*Figure 6 — The gap between the two measurements is the artifact. It is widest at
+*Figure 8 — The gap between the two measurements is the artifact. It is widest at
 the shortest dwell, which is exactly where the hypothesis under test predicted a
 real deficit.*
 
@@ -469,62 +554,57 @@ a residual few-point bias confined to their final cells.
 
 ---
 
-## 9. Limitations and future work
+## 9. Limitations and what remains open
 
-**Limitations.** Single site, single receiver network, **single transmitter**,
-ambient density 6–31 finders across the corpus. Every result is therefore "at
-urban Singapore density," measured on one ESP32. The channel under genuine
-scarcity has still not been characterised — the one axis the corpus never
-manipulated is the finder population itself. Latency figures are lower bounds set
-by poller patience (§5). Diurnal drift is balanced by interleaving, not
-controlled, and board position is an uncontrolled covariate that the anchor cells
-can detect but not attribute.
+Experimental work on this system is complete; what follows is what the corpus
+does not establish, stated so the results are not read past their support.
 
-**Settling the comb.** §4's scan-locking model makes sharp predictions, and three
-`adv` levels would separate it from the alternative that the transmitter's own
-`advDelay` randomisation is at fault. In order of value:
+**Limitations.**
 
-1. **`adv` = 450 ms** — the clean discriminator between a 300 ms scan interval
-   and a 150 ms one. If `S` = 300, `gcd` = 150 → 2 phases → an *intermediate*
-   penalty. If `S` = 150, 450 ms is fully locked → a severe one. One level
-   separates the two models.
-2. **Off-grid levels 150 / 250 / 350 ms** — the current grid cannot show a
-   gradient because every level is a multiple of 100. The model predicts 250 and
-   350 ms (gcd 50, 6 phases) are the cleanest cells in the matrix and 150 ms
-   (2 phases) falls between locked and clean.
-3. **A locked interval at high broadcast count — `adv` 600 ms at 16 broadcasts.**
-   The random-walk escape story predicts the penalty largely *disappears*, since
-   16 events give the phase enough steps to find the scan window. If it persists,
-   `advDelay` is implicated and the finding concerns this radio rather than the
-   network. Most consequential of the three: it decides whether the rule is
-   "avoid multiples of 300 ms" or "avoid them only below ~8 broadcasts per key".
+- **Single site, single receiver network, single transmitter.** Every number is
+  "at urban Singapore density, on one ESP32." The comb in particular would be far
+  stronger if it reproduced on different hardware, because that is exactly what
+  separates a relay-network property from a controller property.
+- **Density was never manipulated.** Ambient finder counts ran 6–31 across the
+  corpus as a nuisance variable, not a treatment. The channel under genuine
+  scarcity — the regime a real deployment cares about — is uncharacterised. A
+  density matrix was built but not run: the available site reads 10.6–13.5 mean
+  finders across the whole day with within-hour scatter of 3–23, so its noise is
+  several times its diurnal signal and a run there would have produced a flat
+  line regardless of the truth. Doing it properly needs a venue with real footfall
+  variation, regimes persisting 30+ minutes, and a low → high → low reversal so
+  density is not confounded with elapsed time.
+- **Latency figures are lower bounds** set by poller patience, and unlike
+  deliverability they cannot be recovered by re-analysis (§7). Fixing them
+  requires re-running with more patient polling, not reprocessing.
+- **Anchors detect a bad night but cannot calibrate one.** The anchor condition
+  (+9 dBm, 8 broadcasts) sits at ceiling by design, so it is insensitive to
+  shifts that move fragile cells substantially — runs 4 and 6 both read ~100% on
+  anchors while a shared condition moved 13 points between them. Within-run
+  contrasts are sound; cross-run absolute rates are not.
+- **Board position is an uncontrolled covariate**, and diurnal drift is balanced
+  by interleaving rather than controlled.
 
-Extending the comb to 1500 / 1800 / 2100 ms would confirm the periodicity
-continues, but every resonance model predicts that, so it is the least
-informative. Worth noting that the comb was measured only at −24 dBm; whether it
-survives at full power, where delivery is otherwise saturated, is untested and
-matters for whether it constrains real deployments.
+**What would settle the scanner model.** §4 bounds the scanner's duty cycle but
+does not pin it. Two experiments would:
 
-**Density** (`matrix.density.json`, built, unrun). Three conditions — the anchor
-plus two deliberately fragile ones at 4 and 2 broadcasts per key — over ~6 h,
-which is what turns "we never saw the cliff" into a quantified threshold. It
-needs a venue the current site cannot provide: that site reads 10.6–13.5 mean
-finders across the whole day with within-hour scatter of 3–23, so its noise is
-several times its diurnal signal and any run there yields a flat line. The
-requirements are range wide enough to move the 2-broadcast condition, regimes
-persisting 30+ minutes so whole interleaving blocks fit inside one, and ideally a
-low → high → low reversal, since a monotone ramp leaves density confounded with
-elapsed time.
+1. **A long-dwell escape measurement** — `adv` 600 ms at 32, 64 and 128
+   broadcasts per key. The model puts the escape at sixty-odd events, so delivery
+   should climb back to control levels somewhere in that range. The broadcast
+   count at which it recovers gives the phase drift rate directly, and drift rate
+   together with notch depth is enough to compute the scan window rather than
+   bound it. This is the single most informative run left undone.
+2. **Notch width** — `adv` swept in 5–10 ms steps across 590–610 ms. How far off
+   600 ms the penalty persists measures how tightly phase must match, which is a
+   second, independent route to the same window estimate.
 
-**A second transmitter.** Every result here comes from one board. The comb in
-particular would be far stronger if it reproduced on different hardware, because
-that is exactly what separates a relay-network property from an ESP32 controller
-property — and that distinction is currently the largest open question in the
-report.
+Both are cheap — a few hours each — and neither needs a new site or new hardware.
 
-**Sub-floor attenuation.** Probing the genuine weak-signal cliff needs an inline
-RF attenuator or characterised shielding; the −24 dBm PA floor still delivers
-89%, and antenna removal is a regime switch rather than a dial (§8).
+**What would generalise it.** A second transmitter of a different make, and a
+repeat at full transmit power: the comb was characterised only at −24 dBm, where
+delivery has headroom. Whether it survives at +9 dBm, where delivery is otherwise
+saturated, determines whether it constrains real deployments or is a curiosity of
+the attenuated regime.
 
 ---
 

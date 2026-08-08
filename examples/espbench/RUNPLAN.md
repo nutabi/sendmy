@@ -86,7 +86,8 @@ own contrast.
 | 2 | `matrix.broadcasts.json` (+ `_resume`) | 2.8 h | Dwell or broadcast count? | **done** — answer: broadcast count |
 | 3 | `matrix.dwell_low.json` | 4.5 h | Is there a dwell floor below 4 s? | **done** — answer: no, but `adv` bands found |
 | 4 | `matrix.advsweep.json` | ~4.9 h | Is the run-3 penalty a property of `adv` or of dwell? | **done** — answer: `adv`, a 300 ms comb |
-| 5 | `matrix.density.json` | ~6 h | Does the broadcast rule hold as the city empties? | needs a new location |
+| 5 | `matrix.density.json` | ~6 h | Does the broadcast rule hold as the city empties? | **not run** — no suitable venue |
+| 6 | `matrix.advsweep2.json` | ~2.7 h | Is the comb graded, and does it escape with broadcast count? | **done** — graded; does not escape |
 | — | `matrix.throughput.json` | ~6.8 h | **Dropped** — see below |  |
 
 Numbering follows what was actually run, not the original plan. Add
@@ -577,6 +578,62 @@ cells.
 - **The channel-aliasing hypothesis is now supported but still unproven.**
   A 300 ms period is the observable; the mechanism linking it to the 37/38/39
   hop pattern is not established here.
+
+### Run 6 — comb follow-up at −24 dBm (2026-08-08)
+
+`results/advsweep2_20260808T111327Z`. 138 cells / 2760 keys, antenna fitted,
+−24 dBm. Ran 19:13–21:53 with **no errors and no USB dropout**. Resweep held
+until +2 h per the run-4 rule; the propagation check confirms it worked — the
+final hour is the *highest* bucket (89.0%), not the lowest.
+
+Anchors 240/240 = **100.0%**.
+
+**Arm A — the response is graded by phases visited.** All four phase counts occur
+within this run at 4 broadcasts per key:
+
+| phases, `300/gcd(adv,300)` | 1 | 2 | 3 | 6 |
+|---|---|---|---|---|
+| `adv` (ms) | 600 | 150, 450 | 500 | 250, 350 |
+| delivered | 48.3% | 76.1% | 79.4% | **85.0%** |
+
+6-phase over 2-phase **+12.4 points, p = 0.0001**. Monotone, saturating between
+3 and 6 phases. **`adv` 450 came back intermediate (75.6%), not severe**, which
+is the discriminator: under a 150 ms scan interval it would be fully locked.
+That favours `S` = 300 ms.
+
+**Arm B — the penalty does NOT escape with broadcast count.**
+
+| broadcasts/key | 4 | 8 | 16 |
+|---|---|---|---|
+| `adv` 500 (control) | 79.4% | 97.8% | **98.9%** |
+| `adv` 600 (locked) | 48.3% | 61.7% | **76.7%** |
+| gap | +31.1 | +36.1 | **+22.2** (p = 0.001) |
+
+This is consistent with the locking model, not against it: `advDelay` advances
+phase ~5 ms per event, so 16 events buy ~80 ms of drift against a ~300 ms cycle
+and sixty-odd events would be needed to traverse it. **The prediction written in
+the run-6 matrix `_note` — that the penalty would largely vanish by 16
+broadcasts — was wrong on the model's own arithmetic.** Arm B therefore does not
+discriminate network-property from controller-defect; what it establishes is the
+practical rule.
+
+**Changes this forces:**
+
+- **The broadcast-count rule and the advertising-interval rule are independent.**
+  "≥8 broadcasts per key" does not buy your way out of a locked interval. State
+  both: ≥8 broadcasts *and* never a multiple of 300 ms.
+- **The scanner inference is now the strongest result in the corpus** — a
+  measurement of relay scan behaviour from delivery statistics alone. Written up
+  in the report, § 4.
+- **Cross-run absolute rates must not be quoted.** Run 6 ran at median 10 finders
+  against run 4's 16, and the shared `adv` 500 / bc 4 condition moved 92.5% →
+  79.4% while anchors read 100% in both. The anchor is too strong to calibrate
+  this; only within-run contrasts are safe.
+
+**The series ends here.** Run 5 (density) was not run: the available site's noise
+is several times its diurnal signal, so it would have produced a flat line
+whatever the truth. The matrix is retained and the venue requirements are
+recorded in the report, § 9.
 
 ## Retained from the earlier corpus
 

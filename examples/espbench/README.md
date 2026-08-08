@@ -722,33 +722,80 @@ broadcasts per key, and do not choose an advertising interval that is a multiple
 of 300 ms.** The nearby intervals are fine — 500 ms and 1100 ms both deliver
 above 92% at a broadcast count where 600 ms and 1200 ms fail.
 
+### Comb follow-up — the response is graded, and it does not escape
+
+**Parameters.** 138 cells / 2760 keys (`matrix.advsweep2.json`,
+`results/advsweep2_20260808T111327Z`), antenna fitted, `tx_power_dbm: -24`.
+Two arms: off-grid `adv` {150, 250, 350, 450} ms at 4 and 6 broadcasts, and
+`adv` {500, 600} ms at 4, 8 and 16 broadcasts. 14 conditions × 9 reps, 12
+anchors. Deliverability from the offline resweep, held until +2 h.
+
+**Statistics.** Anchors 240/240 = **100.0%**.
+
+All four phase counts occur within this run at 4 broadcasts per key:
+
+| phases, `300/gcd(adv,300)` | 1 | 2 | 3 | 6 |
+|---|---|---|---|---|
+| `adv` (ms) | 600 | 150, 450 | 500 | 250, 350 |
+| delivered | 48.3% | 76.1% | 79.4% | **85.0%** |
+
+6-phase over 2-phase: **+12.4 points, p = 0.0001**. `adv` 450 ms came back
+intermediate rather than severe, which discriminates a 300 ms scan cycle from a
+150 ms one.
+
+| broadcasts/key | 4 | 8 | 16 |
+|---|---|---|---|
+| `adv` 500 (control) | 79.4% | 97.8% | **98.9%** |
+| `adv` 600 (locked) | 48.3% | 61.7% | **76.7%** |
+
+**Result.** Delivery is set by how many distinct phases of a ~300 ms scan cycle
+the advertiser reaches, and **raising broadcast count does not rescue a locked
+interval** — the control is at ceiling by 8 broadcasts while the locked interval
+is still 22 points short at 16 (p = 0.001). This is consistent with the locking
+model: `advDelay` drifts phase ~5 ms per event, so 16 events buy ~80 ms against a
+~300 ms cycle. **The broadcast-count rule and the advertising-interval rule are
+independent constraints — satisfy both.** Read in reverse, the result measures
+the relay scanner's duty cycle from delivery statistics alone; the full inference
+is in `report/espbench-report.md` § 4.
+
+*Cross-run caveat: this run had median 10 finders against the fine sweep's 16,
+and the shared condition moved 92.5% → 79.4% while anchors read 100% in both.
+Only within-run contrasts are safe.*
+
 ## Future work
 
-**Separate the scan-locking hypothesis from a transmitter artifact.** In
-priority order:
+Experimental work on this harness is complete. The three `adv` levels that were
+listed here — 450 ms, the off-grid levels, and a locked interval at 16
+broadcasts — were all run (see the comb follow-up above). What is left:
 
-1. **`adv` = 450 ms.** The clean discriminator between a 300 ms scan interval and
-   a 150 ms one. If `S` = 300, `gcd` = 150 → 2 phases → an *intermediate*
-   penalty. If `S` = 150, 450 is fully locked → a severe one. One level
-   separates the two models.
-2. **Off-grid levels — 150, 250, 350 ms.** The current grid could not show a
-   gradient because every level is a multiple of 100. The model predicts 250 and
-   350 (gcd 50, 6 phases) are the cleanest cells in the matrix and 150 (2 phases)
-   sits between locked and clean. This is where a graded response should appear.
-3. **A locked interval at high broadcast count — `adv` 600 ms at 16 broadcasts.**
-   The random-walk escape story predicts the penalty largely *disappears*,
-   because 16 events give the phase enough steps to find the scan window. If it
-   persists, `advDelay` is implicated and the finding is about our radio rather
-   than the network. This is the most consequential of the three: it decides
-   whether the advice is "avoid multiples of 300 ms" or "avoid them only below
-   ~8 broadcasts per key".
+**Pin the scanner's duty cycle rather than bound it.** Two runs would do it, a
+few hours each, needing no new site or hardware:
+
+1. **A long-dwell escape measurement** — `adv` 600 ms at 32, 64 and 128
+   broadcasts per key. The model puts the escape at sixty-odd events, so delivery
+   should climb back to control levels somewhere in that range. Where it recovers
+   gives the phase drift rate directly, and drift rate plus notch depth is enough
+   to compute the scan window. This is the most informative run left undone.
+2. **Notch width** — `adv` in 5–10 ms steps across 590–610 ms. How far off 600 ms
+   the penalty persists measures how tightly phase must match, an independent
+   route to the same estimate.
+
+**Generalise it.** A second transmitter of a different make would separate a
+relay-network property from an ESP32 controller property — currently the largest
+open question. And the comb was characterised only at −24 dBm: whether it
+survives at full power, where delivery is otherwise saturated, decides whether it
+constrains real deployments.
 
 **Extend the comb.** Levels at 1500/1800/2100 ms would confirm the periodicity
-continues past the current sweep. Least informative of the set — every resonance
-model predicts yes — but cheap.
+continues past the current sweep. Least informative — every resonance model
+predicts yes — but cheap.
 
-**Crowd density.** `matrix.density.json` asks whether the broadcast-count rule
-holds as the finder population thins. It needs a venue with real footfall
+**Crowd density — built but not run.** `matrix.density.json` asks whether the
+broadcast-count rule holds as the finder population thins. It was not run
+because no suitable venue was available: the site used throughout reads
+10.6–13.5 mean finders across the whole day with within-hour scatter of 3–23, so
+its noise is several times its diurnal signal and any run there would return a
+flat line whatever the truth. Doing it properly needs a venue with real footfall
 variation: the range must be wide enough to move the most fragile condition,
 each regime must persist 30+ minutes so whole blocks fit inside it, and a
 low → high → low reversal is worth more than a monotone ramp, which would leave

@@ -29,6 +29,7 @@ OUT = ROOT / "report" / "assets"
 RUN_ADV = RESULTS / "advertising_20260717T163332Z"
 RUN_FAC = RESULTS / "dwell_isobroadcast_20260806T155051Z"
 RUN_COMB = RESULTS / "advsweep_20260808T012343Z"
+RUN_COMB2 = RESULTS / "advsweep2_20260808T111327Z"
 RUN_BC = [RESULTS / "broadcasts_20260807T133206Z",
           RESULTS / "broadcasts_resume_20260807T142927Z"]
 
@@ -162,7 +163,7 @@ def fig_propagation_cdf():
                  color=INK, fontsize=12, pad=12, loc="left")
     ax.annotate(f"run E · {len(e)} of {total} keys timed · poller patience 600 s",
                 xy=(0, -0.24), xycoords="axes fraction", color=MUTED, fontsize=9)
-    save(fig, "fig2-propagation-cdf")
+    save(fig, "fig5-propagation-cdf")
 
 
 def _comb_data():
@@ -217,7 +218,94 @@ def fig_adv_comb():
     ax.legend(handles=[Line2D([], [], color=S2, linewidth=2.4, label="4 broadcasts per key"),
                        Line2D([], [], color=S1, linewidth=2.4, label="6 broadcasts per key")],
               frameon=False, loc="lower right", fontsize=9)
-    save(fig, "fig1-adv-comb")
+    save(fig, "fig2-adv-comb")
+
+
+def _run6(bc_filter=None):
+    """Run 6 cells as (broadcasts, adv, delivered, total)."""
+    out = []
+    for r in csv.DictReader(open(RUN_COMB2 / "resweep.csv")):
+        m = re.match(r"s\d+_b(\d+)_a(\d+)$", r["cell"])
+        if not m:
+            continue
+        bc, adv = int(m.group(1)), int(m.group(2))
+        if bc_filter and bc != bc_filter:
+            continue
+        out.append((bc, adv, int(r["delivered"]), int(r["total"])))
+    return out
+
+
+def fig_phase_response():
+    """Job: magnitude across an ordered level. Form: lollipop, zero base."""
+    from math import gcd
+    g = defaultdict(lambda: [0, 0])
+    lev = defaultdict(set)
+    for bc, adv, d, t in _run6(bc_filter=4):
+        ph = 300 // gcd(adv, 300)
+        g[ph][0] += d; g[ph][1] += t; lev[ph].add(adv)
+    phases = sorted(g)
+    pct = [100 * g[k][0] / g[k][1] for k in phases]
+
+    fig, ax = plt.subplots(figsize=(7.0, 4.2))
+    frame(ax)
+    x = range(len(phases))
+    ax.vlines(x, 0, pct, color=GRID, linewidth=2.0)
+    ax.plot(x, pct, "o", color=S1, markersize=10,
+            markeredgecolor=SURFACE, markeredgewidth=2, linestyle="none")
+    for i, (k, v) in enumerate(zip(phases, pct)):
+        ax.annotate(f"{v:.1f}%", (i, v), textcoords="offset points",
+                    xytext=(0, 12), ha="center", color=INK_2, fontsize=10,
+                    fontweight="bold")
+        ax.annotate("adv " + ", ".join(str(a) for a in sorted(lev[k])) + " ms",
+                    (i, 3), ha="center", color=MUTED, fontsize=9)
+
+    ax.set_xticks(list(x))
+    ax.set_xticklabels([f"{k}" for k in phases])
+    ax.set_ylim(0, 100)
+    ax.set_xlabel("distinct phases the advertiser visits in the scan cycle,  300 / gcd(adv, 300)")
+    ax.set_ylabel("deliverability (%)")
+    ax.set_title("Delivery is set by how many scan-cycle phases the advertiser reaches",
+                 color=INK, fontsize=12, pad=12, loc="left")
+    ax.annotate("run 6 · all four levels within one run, at 4 broadcasts per key · "
+                "+12.4 points 6-phase over 2-phase, p = 0.0001",
+                xy=(0, -0.24), xycoords="axes fraction", color=MUTED, fontsize=9)
+    save(fig, "fig3-phase-response")
+
+
+def fig_escape_curve():
+    """Job: two identities across an ordered level. Form: line + marker."""
+    g = defaultdict(lambda: [0, 0])
+    for bc, adv, d, t in _run6():
+        if adv in (500, 600) and bc in (4, 8, 16):
+            g[(adv, bc)][0] += d; g[(adv, bc)][1] += t
+    bcs = [4, 8, 16]
+    x = list(range(len(bcs)))
+    fig, ax = plt.subplots(figsize=(7.0, 4.2))
+    frame(ax)
+    for adv, colour, lab in ((500, S1, "adv 500 ms — 3 phases"),
+                             (600, S2, "adv 600 ms — 1 phase (locked)")):
+        y = [100 * g[(adv, b)][0] / g[(adv, b)][1] for b in bcs]
+        ax.plot(x, y, "-", color=colour, linewidth=2.0)
+        ax.plot(x, y, "o", color=colour, markersize=9, linestyle="none",
+                markeredgecolor=SURFACE, markeredgewidth=2)
+        for i, v in enumerate(y):
+            ax.annotate(f"{v:.1f}%", (i, v), textcoords="offset points",
+                        xytext=(0, 11 if adv == 500 else -20), ha="center",
+                        color=INK_2, fontsize=9)
+    ax.set_xticks(x); ax.set_xticklabels([str(b) for b in bcs])
+    ax.set_xlim(-0.3, len(bcs) - 0.7)
+    ax.set_ylim(35, 108)
+    ax.set_xlabel("broadcasts per key")
+    ax.set_ylabel("deliverability (%)")
+    ax.set_title("More broadcasts do not rescue a locked advertising interval",
+                 color=INK, fontsize=12, pad=12, loc="left")
+    ax.annotate("run 6 · −24 dBm · the control reaches ceiling by 8 broadcasts; "
+                "the locked interval is still 22 points short at 16 (p = 0.001)",
+                xy=(0, -0.24), xycoords="axes fraction", color=MUTED, fontsize=9)
+    ax.legend(handles=[Line2D([], [], color=S1, linewidth=2.4, label="adv 500 ms — 3 phases"),
+                       Line2D([], [], color=S2, linewidth=2.4, label="adv 600 ms — 1 phase (locked)")],
+              frameon=False, loc="lower right", fontsize=9)
+    save(fig, "fig4-escape-curve")
 
 
 def fig_broadcast_delivery():
@@ -263,7 +351,7 @@ def fig_broadcast_delivery():
     ax.legend(handles=[Line2D([], [], color=S1, linewidth=2.4, label="+9 dBm"),
                        Line2D([], [], color=S2, linewidth=2.4, label="−24 dBm")],
               frameon=False, loc="lower right", fontsize=9)
-    save(fig, "fig6-broadcast-delivery")
+    save(fig, "fig1-broadcast-delivery")
 
 
 def fig_factorial():
@@ -300,7 +388,7 @@ def fig_factorial():
     ax.annotate("run E · deliverability was 100% in five of six conditions and "
                 "99.7% in the sixth (1,799/1,800 keys overall)",
                 xy=(0, -0.34), xycoords="axes fraction", color=MUTED, fontsize=9)
-    save(fig, "fig3-factorial-dumbbell")
+    save(fig, "fig6-factorial-dumbbell")
 
 
 def fig_live_vs_offline():
@@ -345,7 +433,7 @@ def fig_live_vs_offline():
         t.set_color(INK_2)
     ax.annotate("run A · 2,400 keys · figures as published in the harness README",
                 xy=(0, -0.34), xycoords="axes fraction", color=MUTED, fontsize=9)
-    save(fig, "fig5-live-vs-offline")
+    save(fig, "fig8-live-vs-offline")
 
 
 def fig_paired_diffs():
@@ -387,13 +475,15 @@ def fig_paired_diffs():
     ax.annotate(f"run E · {pos} of {len(diffs)} pairs favour 20 broadcasts "
                 f"(above zero) · sign test p = 0.049",
                 xy=(0, -0.26), xycoords="axes fraction", color=MUTED, fontsize=9)
-    save(fig, "fig4-paired-differences")
+    save(fig, "fig7-paired-differences")
 
 
 if __name__ == "__main__":
     style()
     fig_adv_comb()           # figure 1
     fig_broadcast_delivery() # figure 6
+    fig_phase_response()     # figure 7
+    fig_escape_curve()       # figure 8
     fig_propagation_cdf()    # figure 2
     fig_factorial()          # figure 3
     fig_paired_diffs()       # figure 4
