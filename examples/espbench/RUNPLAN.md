@@ -85,7 +85,7 @@ own contrast.
 | 1b | `matrix.txpower_dwell_noant.json` (+ `_resume`) | 2.7 h | Can antenna removal serve as an attenuation dial? | **done** — answer: no |
 | 2 | `matrix.broadcasts.json` (+ `_resume`) | 2.8 h | Dwell or broadcast count? | **done** — answer: broadcast count |
 | 3 | `matrix.dwell_low.json` | 4.5 h | Is there a dwell floor below 4 s? | **done** — answer: no, but `adv` bands found |
-| 4 | `matrix.advsweep.json` | ~4.9 h | Is the run-3 penalty a property of `adv` or of dwell? |  |
+| 4 | `matrix.advsweep.json` | ~4.9 h | Is the run-3 penalty a property of `adv` or of dwell? | **done** — answer: `adv`, a 300 ms comb |
 | 5 | `matrix.density.json` | ~6 h | Does the broadcast rule hold as the city empties? | needs a new location |
 | — | `matrix.throughput.json` | ~6.8 h | **Dropped** — see below |  |
 
@@ -516,6 +516,67 @@ never visited 600 or 1200 ms.
 - **The ≥8 broadcasts recommendation stands** but should be stated as
   "≥8 broadcasts per key, avoiding advertising intervals near 600 and 1200 ms
   pending the sweep."
+
+### Run 4 — fine `adv` sweep at −24 dBm (2026-08-08)
+
+`results/advsweep_20260808T012343Z`. 168 cells / 3360 keys, antenna fitted,
+`tx_power_dbm: -24`. `adv` 200–1400 ms in 100 ms steps crossed with
+broadcasts {4, 6}; 6 reps each, 12 anchors opening and bisecting every block.
+Ran 09:23–14:52 local with **no errors and no USB dropout**. Offline resweep.
+
+Anchors 239/240 = **99.6%** — on the series baseline.
+
+| adv | b4 | b6 | | adv | b4 | b6 |
+|---|---|---|---|---|---|---|
+| 200 | 89.2% | 96.7% | | 900 | **58.3%** | **83.3%** |
+| **300** | **59.2%** | **74.2%** | | 1000 | 77.5% | 97.5% |
+| 400 | 93.3% | 95.0% | | 1100 | 94.2% | 94.2% |
+| 500 | 92.5% | 99.2% | | **1200** | **73.3%** | **72.5%** |
+| **600** | **59.2%** | **74.2%** | | 1300 | 93.3% | 93.3% |
+| 700 | 90.0% | 96.7% | | 1400 | 88.3% | 96.7% |
+| 800 | 85.0% | 96.7% | | | | |
+
+**The penalty is a comb at every multiple of 300 ms**, not a single resonance:
+
+| | rate | keys |
+|---|---|---|
+| adv ∈ {300, 600, 900, 1200} | **69.3%** | 665/960 |
+| all other adv | **92.7%** | 2003/2160 |
+
+**23.5 points, p = 0.00005** (cell-clustered permutation, 20 000 shuffles).
+Present in both arms independently: b4 62.5% vs 89.3%, b6 76.0% vs 96.2%.
+
+**Run 3's attribution was correct — this is `adv`, not dwell.** The penalty
+lands at the *same* `adv` in both broadcast arms while dwell at those points
+differs between them (b4: 1200/2400/3600/4800 ms; b6: 1800/3600/5400/7200 ms).
+Had the effect been dwell-driven it would have appeared at different `adv` in
+each arm. It does not.
+
+It also replicates run 3 exactly: run 3's bad levels were 600 and 1200 — both
+multiples of 300 — and its clean levels 200, 400, 800 are not. Run 3 saw two
+points of a comb it lacked the resolution to resolve.
+
+**Measurement error worth not repeating: the first resweep was launched ~1 min
+after transmit ended and the last hour of cells had not propagated**, reading
+29.6% against 87–91% for everything older. Re-swept at +3.1 h, the same cells
+read 76.1% while the 1–5 h buckets came back byte-identical. The early sweep is
+kept as `resweep_early.csv`. **Leave ≥2 h between transmit end and resweep.**
+Runs 1–3 swept at +1.3–1.7 h and carry a residual few-point bias in their final
+cells.
+
+**Changes this forces:**
+
+- **`adv` multiples of 300 ms are a design hazard.** State the operating point
+  as "≥8 broadcasts per key, and avoid advertising intervals at multiples of
+  300 ms." This is a protocol-design finding, not a measurement artifact.
+- **`adv` is a confirmed latent covariate in every earlier run.** Runs 1/1b
+  scaled it with dwell; run 2 varied it *as* the broadcast axis. Run 2's
+  headline survives — its curve is monotone across five `adv` values and
+  55 points deep — but no cross-run `adv` comparison is safe without checking
+  the comb.
+- **The channel-aliasing hypothesis is now supported but still unproven.**
+  A 300 ms period is the observable; the mechanism linking it to the 37/38/39
+  hop pattern is not established here.
 
 ## Retained from the earlier corpus
 
