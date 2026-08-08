@@ -28,6 +28,9 @@ OUT = ROOT / "report" / "assets"
 
 RUN_ADV = RESULTS / "advertising_20260717T163332Z"
 RUN_FAC = RESULTS / "dwell_isobroadcast_20260806T155051Z"
+RUN_COMB = RESULTS / "advsweep_20260808T012343Z"
+RUN_BC = [RESULTS / "broadcasts_20260807T133206Z",
+          RESULTS / "broadcasts_resume_20260807T142927Z"]
 
 # -- palette (validated light-mode instance; see dataviz references/palette.md) --
 SURFACE = "#fcfcfb"
@@ -161,35 +164,105 @@ def fig_propagation_cdf():
     save(fig, "fig2-propagation-cdf")
 
 
-def fig_advertising():
-    """Job: magnitude across an ordered level. Form: lollipop (non-zero base)."""
-    g = resweep_by(RUN_ADV, r"a(\d+)$")
-    levels = sorted(g)
-    pct = [100 * g[k][0] / g[k][1] for k in levels]
-    bcasts = [8000 // k for k in levels]
+def _comb_data():
+    """Run 4: delivered rate keyed by (broadcasts, adv_ms)."""
+    g = defaultdict(lambda: [0, 0])
+    for r in csv.DictReader(open(RUN_COMB / "resweep.csv")):
+        m = re.match(r"s\d+_b(\d)_a(\d+)$", r["cell"])
+        if not m:
+            continue
+        k = (int(m.group(1)), int(m.group(2)))
+        g[k][0] += int(r["delivered"])
+        g[k][1] += int(r["total"])
+    return g
 
-    fig, ax = plt.subplots(figsize=(7.4, 4.0))
+
+def fig_adv_comb():
+    """Job: magnitude across an ordered level, two identities. Form: line+marker."""
+    g = _comb_data()
+    advs = sorted({k[1] for k in g})
+    fig, ax = plt.subplots(figsize=(7.8, 4.3))
     frame(ax)
-    x = range(len(levels))
-    ax.vlines(x, 98.5, pct, color=GRID, linewidth=2.0)
-    ax.plot(x, pct, "o", color=S1, markersize=9,
-            markeredgecolor=SURFACE, markeredgewidth=2, linestyle="none")
 
-    for i, p in enumerate(pct):
-        if p < 100:
-            ax.annotate(f"{p:.2f}%", (i, p), textcoords="offset points",
-                        xytext=(0, -18), ha="center", color=INK_2, fontsize=9)
+    for a in advs:                       # locked levels behind the data
+        if a % 300 == 0:
+            ax.axvspan(a - 34, a + 34, color=GRID, linewidth=0, zorder=0)
 
-    ax.set_xticks(list(x))
-    ax.set_xticklabels([f"{k}\n{b}×" for k, b in zip(levels, bcasts)])
-    ax.set_ylim(98.4, 100.15)
-    ax.set_xlabel("advertising interval (ms)  ·  broadcasts per key")
+    for bc, colour in ((4, S2), (6, S1)):
+        y = [100 * g[(bc, a)][0] / g[(bc, a)][1] for a in advs]
+        ax.plot(advs, y, "-", color=colour, linewidth=2.0, zorder=2)
+        ax.plot(advs, y, "o", color=colour, markersize=8, linestyle="none",
+                markeredgecolor=SURFACE, markeredgewidth=2, zorder=3)
+        ax.annotate(f"{bc} broadcasts", (advs[-1], y[-1]),
+                    textcoords="offset points", xytext=(8, -3), ha="left",
+                    color=colour, fontsize=10, fontweight="bold")
+
+    ax.set_xticks(advs)
+    ax.set_xticklabels([str(a) for a in advs])
+    for lab in ax.get_xticklabels():
+        if int(lab.get_text()) % 300 == 0:
+            lab.set_color(INK)
+            lab.set_fontweight("bold")
+    ax.set_ylim(50, 103)
+    ax.set_xlim(150, 1520)
+    ax.set_xlabel("advertising interval (ms)")
     ax.set_ylabel("deliverability (%)")
-    ax.set_title("Cutting the radio duty cycle 40× costs one point of delivery",
+    ax.annotate("multiples of 300 ms", xy=(900, 53), ha="center",
+                color=INK_2, fontsize=9)
+    ax.set_title("Delivery collapses at every advertising interval that is a multiple of 300 ms",
                  color=INK, fontsize=12, pad=12, loc="left")
-    ax.annotate("run C · 2,400 keys · dwell fixed at 8 s · y-axis starts at 98.4%",
-                xy=(0, -0.30), xycoords="axes fraction", color=MUTED, fontsize=9)
-    save(fig, "fig1-advertising-sweep")
+    ax.annotate("run 4 · 3,360 keys · −24 dBm · locked levels 69.3% vs 92.7% elsewhere, p = 0.00005",
+                xy=(0, -0.24), xycoords="axes fraction", color=MUTED, fontsize=9)
+    ax.legend(handles=[Line2D([], [], color=S2, linewidth=2.4, label="4 broadcasts per key"),
+                       Line2D([], [], color=S1, linewidth=2.4, label="6 broadcasts per key")],
+              frameon=False, loc="lower right", fontsize=9)
+    save(fig, "fig1-adv-comb")
+
+
+def fig_broadcast_delivery():
+    """Job: magnitude across an ordered level, two identities. Form: line+marker."""
+    g = defaultdict(lambda: [0, 0])
+    for run in RUN_BC:
+        for r in csv.DictReader(open(run / "resweep.csv")):
+            m = re.match(r"s\d+_p([pn])(\d+)_b(\d+)$", r["cell"])
+            if not m:
+                continue
+            dbm = (1 if m.group(1) == "p" else -1) * int(m.group(2))
+            k = (dbm, int(m.group(3)))
+            g[k][0] += int(r["delivered"])
+            g[k][1] += int(r["total"])
+    bcs = sorted({k[1] for k in g})
+    x = list(range(len(bcs)))
+
+    fig, ax = plt.subplots(figsize=(7.0, 4.2))
+    frame(ax)
+    for dbm, colour, lab in ((9, S1, "+9 dBm"), (-24, S2, "−24 dBm")):
+        y = [100 * g[(dbm, b)][0] / g[(dbm, b)][1] for b in bcs]
+        ax.plot(x, y, "-", color=colour, linewidth=2.0)
+        ax.plot(x, y, "o", color=colour, markersize=8, linestyle="none",
+                markeredgecolor=SURFACE, markeredgewidth=2)
+        # direct-label where the series are furthest apart, not where they converge
+        ax.annotate(lab, (x[1], y[1]), textcoords="offset points",
+                    xytext=(6, 10 if dbm > 0 else -18), ha="left", color=colour,
+                    fontsize=10, fontweight="bold")
+        ax.annotate(f"{y[0]:.1f}%", (x[0], y[0]), textcoords="offset points",
+                    xytext=(0, 10 if dbm > 0 else -16), ha="center",
+                    color=INK_2, fontsize=9)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels([str(b) for b in bcs])
+    ax.set_xlim(-0.35, len(bcs) - 0.75)
+    ax.set_ylim(35, 104)
+    ax.set_xlabel("broadcasts per key")
+    ax.set_ylabel("deliverability (%)")
+    ax.set_title("Broadcast count drives delivery; transmit power sets where it saturates",
+                 color=INK, fontsize=12, pad=12, loc="left")
+    ax.annotate("run 2 · 1,980 keys · dwell pinned at 4,000 ms · +18.1 points per doubling at −24 dBm",
+                xy=(0, -0.24), xycoords="axes fraction", color=MUTED, fontsize=9)
+    ax.legend(handles=[Line2D([], [], color=S1, linewidth=2.4, label="+9 dBm"),
+                       Line2D([], [], color=S2, linewidth=2.4, label="−24 dBm")],
+              frameon=False, loc="lower right", fontsize=9)
+    save(fig, "fig6-broadcast-delivery")
 
 
 def fig_factorial():
@@ -318,7 +391,8 @@ def fig_paired_diffs():
 
 if __name__ == "__main__":
     style()
-    fig_advertising()        # figure 1
+    fig_adv_comb()           # figure 1
+    fig_broadcast_delivery() # figure 6
     fig_propagation_cdf()    # figure 2
     fig_factorial()          # figure 3
     fig_paired_diffs()       # figure 4

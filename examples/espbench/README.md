@@ -537,6 +537,17 @@ characterized shielding), not the PA setting.
 
 ### Advertising-interval sweep — duty cycle is nearly free
 
+> **Superseded 2026-08-08 — the conclusion holds only because of the levels it
+> happened to pick.** A fine sweep at 100 ms resolution (`RUNPLAN.md` § Run 4)
+> found delivery collapses at advertising intervals that are **multiples of
+> 300 ms** — 69.3% against 92.7% elsewhere. This run sampled
+> 100/250/500/1000/2000/4000 ms, none of which is a multiple of 300, so it
+> stepped over every bad interval by luck. "Duty cycle is nearly free" is true
+> *at these six intervals* and false in general. Its secondary conclusion —
+> "dwell, not broadcast rate, is what delivery depends on" — is also inverted:
+> a controlled run (§ Run 2) shows **broadcast count is the driver**; this run
+> could not see that because it held broadcasts and dwell in lockstep.
+
 **Parameters.** 120 `incremental` cells (`matrix.advertising.json`,
 `results/advertising_20260717T163332Z`), 20 windows each, over six advertising
 intervals — **100/250/500/1000/2000/4000 ms** — at a **fixed 8 s dwell**, so a
@@ -621,6 +632,134 @@ also held steady while finder density more than halved, which suggests delivery
 saturates well below the density seen here — but that is a two-point observation
 from one night, and the density matrix (`matrix.density.json`) is the run that
 would actually test it.
+
+### Fine advertising-interval sweep — delivery drops at multiples of 300 ms
+
+**Parameters.** 168 cells / 3360 keys (`matrix.advsweep.json`,
+`results/advsweep_20260808T012343Z`), antenna fitted, `tx_power_dbm: -24`.
+Advertising interval swept **200–1400 ms in 100 ms steps** (13 levels), crossed
+with **two broadcast counts, 4 and 6**, 6 reps each. 12 anchor cells open and
+bisect every block. Deliverability is the offline resweep.
+
+*Why two broadcast levels.* `broadcasts = dwell / adv`, so only two of the three
+can be fixed. Pinning dwell would let broadcast count vary, and broadcast count
+is the largest effect in the corpus — it would swamp the `adv` signal. So
+broadcasts are pinned and run at two levels; the second level is what separates
+an `adv` effect from a dwell effect.
+
+**Goal.** An earlier run at five `adv` levels found a 22.6-point penalty at 600
+and 1200 ms, but pinned `adv = dwell/5`, leaving the two perfectly confounded.
+This run separates them and maps where the penalty sits.
+
+**Statistics.** Anchors 239/240 = **99.6%**, on the series baseline.
+
+| adv (ms) | 200 | **300** | 400 | 500 | **600** | 700 | 800 |
+|---|---|---|---|---|---|---|---|
+| 4 broadcasts | 89.2% | **59.2%** | 93.3% | 92.5% | **59.2%** | 90.0% | 85.0% |
+| 6 broadcasts | 96.7% | **74.2%** | 95.0% | 99.2% | **74.2%** | 96.7% | 96.7% |
+
+| adv (ms) | **900** | 1000 | 1100 | **1200** | 1300 | 1400 |
+|---|---|---|---|---|---|---|
+| 4 broadcasts | **58.3%** | 77.5% | 94.2% | **73.3%** | 93.3% | 88.3% |
+| 6 broadcasts | **83.3%** | 97.5% | 94.2% | **72.5%** | 93.3% | 96.7% |
+
+Grouping by whether `adv` is a multiple of 300:
+
+| | deliverability | keys |
+|---|---|---|
+| adv ∈ {300, 600, 900, 1200} | **69.3%** | 665/960 |
+| all other adv | **92.7%** | 2003/2160 |
+
+**23.5 points, p = 0.00005** (cell-clustered permutation, 20 000 shuffles).
+Present independently in both arms: 4 broadcasts 62.5% vs 89.3%, 6 broadcasts
+76.0% vs 96.2%.
+
+**Result — the penalty is a comb in `adv`, not a dwell effect.** It lands at the
+*same* advertising intervals in both broadcast arms, while dwell at those points
+differs between them (4 broadcasts: 1200/2400/3600/4800 ms; 6 broadcasts:
+1800/3600/5400/7200 ms). A dwell-driven effect would have appeared at different
+`adv` in each arm. It does not. This also replicates the earlier five-level run
+exactly: its bad levels (600, 1200) are multiples of 300 and its clean levels
+(200, 400, 800) are not — it had seen two points of a comb it could not resolve.
+
+**Leading hypothesis: phase locking between advertising and scanning.** Not
+channel aliasing — in legacy BLE one advertising *event* transmits on 37, 38 and
+39 within a few milliseconds, so a scanner parked on any single channel hears
+every event, and channel rotation cannot produce a comb. What can is
+commensurability with the relay's **scan interval**. Scanners duty-cycle: a scan
+window `W` inside a scan interval `S`. If `adv` is an exact multiple of `S`,
+every advertising event lands at the same phase relative to that window — so if
+the phase falls in dead time, the scanner never hears the device for the whole
+dwell, however many events are sent. Taking **S = 300 ms**, the number of
+distinct phases visited is `S / gcd(adv, S)`:
+
+| adv | gcd(adv, 300) | phases visited | observed |
+|---|---|---|---|
+| 300, 600, 900, 1200 | 300 | **1** | **penalised** |
+| 200, 400, 500, 700, 800, 1000, 1100, 1300, 1400 | 100 | 3 | clean |
+
+One free parameter fits all thirteen levels. It also explains the arm
+difference: the BLE spec's mandatory 0–10 ms random `advDelay` per event gives
+the phase a slow random walk, so more broadcasts mean more chances to escape a
+dead phase — which is why 6 broadcasts beats 4 at exactly the penalised levels
+and nowhere else. And it contradicts nothing already measured: the runs above
+used `adv` of 250/500/1000/2000/4000 ms, whose gcds with 300 are 50 or 100, so
+none of them ever sampled a locked interval.
+
+**This is a hypothesis, not a finding.** The 300 ms period is the observable; the
+scan-interval mechanism is inferred from it. Two things limit it. The sweep's
+100 ms grid means `gcd(adv, 300)` is only ever 100 or 300, so the experiment
+distinguished "1 phase" from "3 phases" and could not measure a gradient. And an
+alternative reading is that the ESP32 controller's `advDelay` randomisation is
+weak or absent, which would make locking permanent rather than escapable — that
+would be a property of this transmitter rather than of the relay network, and it
+changes how far the result generalises. A test for overdispersion at penalised
+levels was inconclusive (3.03× binomial against 3.74× at clean levels), as
+expected once 20 keys are pooled across many scanners with independent phases.
+
+**Practical rule.** Combined with the broadcast-count result: **use at least 8
+broadcasts per key, and do not choose an advertising interval that is a multiple
+of 300 ms.** The nearby intervals are fine — 500 ms and 1100 ms both deliver
+above 92% at a broadcast count where 600 ms and 1200 ms fail.
+
+## Future work
+
+**Separate the scan-locking hypothesis from a transmitter artifact.** In
+priority order:
+
+1. **`adv` = 450 ms.** The clean discriminator between a 300 ms scan interval and
+   a 150 ms one. If `S` = 300, `gcd` = 150 → 2 phases → an *intermediate*
+   penalty. If `S` = 150, 450 is fully locked → a severe one. One level
+   separates the two models.
+2. **Off-grid levels — 150, 250, 350 ms.** The current grid could not show a
+   gradient because every level is a multiple of 100. The model predicts 250 and
+   350 (gcd 50, 6 phases) are the cleanest cells in the matrix and 150 (2 phases)
+   sits between locked and clean. This is where a graded response should appear.
+3. **A locked interval at high broadcast count — `adv` 600 ms at 16 broadcasts.**
+   The random-walk escape story predicts the penalty largely *disappears*,
+   because 16 events give the phase enough steps to find the scan window. If it
+   persists, `advDelay` is implicated and the finding is about our radio rather
+   than the network. This is the most consequential of the three: it decides
+   whether the advice is "avoid multiples of 300 ms" or "avoid them only below
+   ~8 broadcasts per key".
+
+**Extend the comb.** Levels at 1500/1800/2100 ms would confirm the periodicity
+continues past the current sweep. Least informative of the set — every resonance
+model predicts yes — but cheap.
+
+**Crowd density.** `matrix.density.json` asks whether the broadcast-count rule
+holds as the finder population thins. It needs a venue with real footfall
+variation: the range must be wide enough to move the most fragile condition,
+each regime must persist 30+ minutes so whole blocks fit inside it, and a
+low → high → low reversal is worth more than a monotone ramp, which would leave
+density confounded with elapsed time. Scout with `scripts/scan_density.py
+--watch --interval 60` before committing ~6 h, and record the location in the
+matrix `_note` — no logger captures it.
+
+**Second transmitter.** Every result in this corpus comes from one board in one
+location. The comb in particular would be far stronger if it reproduced on
+different hardware, since that is what separates a relay-network property from
+an ESP32 controller property.
 
 ## Manual receiver
 
