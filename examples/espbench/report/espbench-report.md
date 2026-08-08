@@ -261,35 +261,34 @@ where 600 ms and 1200 ms fail.
 Define **propagation delay** as the interval from transmitting a key to the
 moment a report for it first becomes fetchable. This is the channel's true
 end-to-end delay, and it is the quantity a system built on `sendmy` must design
-around.
+around. The estimate below comes from run E alone — latency distributions from
+different runs are not comparable, for reasons given in §7.
 
-![Cumulative distribution of propagation delay, runs C and E](assets/fig2-propagation-cdf.svg)
+![Cumulative distribution of propagation delay, run E](assets/fig2-propagation-cdf.svg)
 
-*Figure 3 — Propagation delay, cumulative. Run E is the usable estimate; run C's
-curve is truncated by its poller, not by the network.*
-
-Run E, over the 1522 keys the poller timed:
+*Figure 3 — Propagation delay over the 1,522 run-E keys the poller timed.*
 
 | min | p25 | **p50** | p75 | **p90** | p99 | max |
 |---|---|---|---|---|---|---|
 | 9 s | 89 s | **158 s** | 265 s | **355 s** | 504 s | 591 s |
 
-So the channel is ~100% reliable but delivers on the order of **minutes**, with
-a tail running past 9 minutes. Half of all keys need more than 2.5 minutes; one
-in ten needs more than 6.
+**The channel is ~100% reliable but delivers on the order of minutes**, with a
+tail running past 9 minutes. Half of all keys need more than 2.5 minutes; one in
+ten needs more than 6. Any application design that assumes seconds is wrong about
+this channel; the right mental model is store-and-forward mail, not a link.
 
-**Cross-run comparison of this distribution is invalid**, and the figure shows
-why. Run C's measured propagation looks much faster (median 91 s, max 334 s),
-but its poller gave each key only 300 s of patience — the distribution is
-**right-censored at the dashed line**, and its apparent speed is the cut-off, not
-the network. Run E's 600 s patience is the less-censored estimate, and even it is
-truncated at 591 s: the true tail is longer than measured. Any latency figure
-from this harness is a lower bound set by the poller's patience, and only
-distributions gathered under identical patience may be compared.
+**Every number in that table is a lower bound.** The poller timed 1,522 of run
+E's 1,800 keys; the other 15% were abandoned before a report appeared and are
+absent from the curve rather than recorded as slow. Since the abandoned keys are
+by construction the slow ones, the true median and p90 are both higher than
+measured, and the measured maximum of 591 s is an artifact of 600 s of poller
+patience rather than a property of the network. **This bias is a property of the
+instrument, not of the channel** — it is the same mechanism that invalidated an
+earlier run's headline deliverability figures, and it is treated in full in §7.
 
-Secondary observations from the same data: the median horizontal accuracy of the
-decrypted location fixes was 87 m, and delivered goodput at these settings ranged
-from 3.7 keys/min (16 s dwell) to 14.8 keys/min (4 s dwell) — 0.062 to
+Two secondary observations from the same data: the median horizontal accuracy of
+the decrypted location fixes was 87 m, and delivered goodput at these settings
+ranged from 3.7 keys/min (16 s dwell) to 14.8 keys/min (4 s dwell) — 0.062 to
 0.246 bit/s, which frames the channel's realistic scale.
 
 ---
@@ -342,10 +341,10 @@ conducted at full transmit power, where delivery is saturated and cannot move.
 Given headroom, broadcast count moves delivery hard (§3). The latency result
 below stands; read it as *broadcast count buys latency as well as delivery*. This is a useful
 separation, because deliverability and latency are routinely conflated when
-tuning BLE beacons, and here they respond to different knobs. It also partially
-contradicts run C, which reported no latency ordering with `adv_ms`; run C read
-latency per level rather than paired, and its distribution was censored at 300 s,
-so it was poorly placed to see a 40 s shift.
+tuning BLE beacons, and here they respond to different knobs. Run C reported no latency
+ordering with `adv_ms`, but that null carries no weight: its per-level coverage
+ran from 94% down to 45% along that very axis (§7), so it was measuring a
+differently-selected subset at each level.
 
 ---
 
@@ -393,6 +392,42 @@ The fix was a **two-tier poller** (a fast tier for propagation timing, a slow
 sweep for deliverability) plus a mandatory offline resweep for ground truth.
 Validation: in run C, live and offline deliverability agreed to within one key at
 every level, and run E's live and offline counts agreed exactly.
+
+**The same bias survives in the latency measurements, and it is why §5 reports
+one run rather than several.** Deliverability was rescued by the offline resweep;
+propagation delay cannot be, because a report fetched hours later carries no
+record of when it first became available. So every latency figure in this report
+is computed over whichever keys the poller happened to catch, and that subset is
+selected for speed. The effect is large and it differs between runs:
+
+| | run C | run E |
+|---|---|---|
+| poller patience | 300 s | 600 s |
+| queue soft cap | 16 | 32 |
+| **keys timed** | **1572 / 2400 = 66%** | **1522 / 1800 = 85%** |
+| observed median | 92 s | 158 s |
+
+Run C looks nearly twice as fast, but its median is the median of its fastest
+66%. Censoring run E's distribution at 300 s to match brings its median from
+158 s to 131 s — closing about half the gap — and the rest is explained by C
+running at a higher average broadcast count and slightly higher finder density,
+both of which genuinely reduce delay (§6).
+
+Within run C the selection is worse still, because **coverage varies along the
+independent variable**:
+
+| adv (ms) | 100 | 250 | 500 | 1000 | 2000 | 4000 |
+|---|---|---|---|---|---|---|
+| broadcasts/key | 80 | 32 | 16 | 8 | 4 | 2 |
+| **keys timed** | **94%** | 89% | 59% | 53% | 54% | **45%** |
+| observed median | 94 s | 76 s | 85 s | 108 s | 97 s | 109 s |
+
+Those medians look flat, and run C reported them as showing no latency ordering
+with `adv`. They are not comparable to one another: the sparse levels appear fast
+because only their fast keys were captured. This is the same failure as run A's —
+sampling loss correlated with the variable under test, manufacturing a plausible
+flat line — and it means run C could not have detected a latency ordering in
+either direction.
 
 ---
 

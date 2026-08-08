@@ -129,27 +129,29 @@ def resweep_by(run, pattern):
 # -------------------------------------------------------------------- figures
 
 def fig_propagation_cdf():
-    """Job: distribution of a continuous delay. Form: step CDF, 2 series."""
-    e, c = propagation(RUN_FAC), propagation(RUN_ADV)
+    """Job: distribution of a continuous delay, one series. Form: step CDF."""
+    e = propagation(RUN_FAC)
+    total = sum(len(json.load(open(RUN_FAC / "summary.json"))[i]["detail"])
+                for i in range(len(json.load(open(RUN_FAC / "summary.json")))))
     fig, ax = plt.subplots(figsize=(7.4, 4.2))
     frame(ax, grid_axis="both")
 
-    for data, color, label in ((c, S2, "Run C — advertising sweep (censored)"),
-                               (e, S1, "Run E — dwell factorial")):
-        y = [100 * (i + 1) / len(data) for i in range(len(data))]
-        ax.step(data, y, where="post", color=color, linewidth=2.0,
-                solid_joinstyle="round", solid_capstyle="round", label=label)
+    y = [100 * (i + 1) / len(e) for i in range(len(e))]
+    ax.step(e, y, where="post", color=S1, linewidth=2.0,
+            solid_joinstyle="round", solid_capstyle="round")
 
-    med = st.median(e)
-    ax.plot([med], [50], "o", color=S1, markersize=8,
-            markeredgecolor=SURFACE, markeredgewidth=2, zorder=5)
-    ax.annotate(f"median {med:.0f} s", (med, 50), textcoords="offset points",
-                xytext=(10, -14), color=INK_2, fontsize=9)
+    for pct, lab in ((50, "median"), (90, "p90")):
+        v = e[min(int(pct / 100 * len(e)), len(e) - 1)]
+        ax.plot([v], [pct], "o", color=S1, markersize=8,
+                markeredgecolor=SURFACE, markeredgewidth=2, zorder=5)
+        ax.annotate(f"{lab} {v:.0f} s", (v, pct), textcoords="offset points",
+                    xytext=(10, -14), color=INK_2, fontsize=9)
 
-    cut = max(c)
-    ax.axvline(cut, color=MUTED, linewidth=1.0, linestyle=(0, (4, 3)), zorder=1)
-    ax.annotate("run C poller cut-off\n(300 s patience)", (cut, 22),
-                textcoords="offset points", xytext=(-8, 0), ha="right",
+    miss = 100 * (total - len(e)) / total
+    ax.annotate(f"{miss:.0f}% of keys were never timed by the poller — they are\n"
+                f"absent from this curve, and they are the slow ones,\n"
+                f"so the true distribution lies to the right of it",
+                xy=(0.985, 0.06), xycoords="axes fraction", ha="right",
                 color=MUTED, fontsize=9)
 
     ax.set_xlim(0, 620)
@@ -158,9 +160,8 @@ def fig_propagation_cdf():
     ax.set_ylabel("keys observed (cumulative %)")
     ax.set_title("The channel delivers in minutes, with a long tail",
                  color=INK, fontsize=12, pad=12, loc="left")
-    leg = ax.legend(frameon=False, loc="lower right", fontsize=9.5)
-    for t in leg.get_texts():
-        t.set_color(INK_2)
+    ax.annotate(f"run E · {len(e)} of {total} keys timed · poller patience 600 s",
+                xy=(0, -0.24), xycoords="axes fraction", color=MUTED, fontsize=9)
     save(fig, "fig2-propagation-cdf")
 
 
