@@ -7,12 +7,18 @@ under results/, except run A's live-vs-offline numbers, which are transcribed
 from the README because that run's artifacts were not retained.
 
     scripts/.venv/bin/python scripts/plot_report.py
+
+The "paper" argument instead writes the compact re-cuts used by
+docs/final/final-paper.typ into docs/final/assets/figures/ (SVG only):
+
+    scripts/.venv/bin/python scripts/plot_report.py paper
 """
 
 import csv
 import json
 import re
 import statistics as st
+import sys
 from collections import defaultdict
 from pathlib import Path
 
@@ -25,6 +31,9 @@ from matplotlib.lines import Line2D
 ROOT = Path(__file__).resolve().parent.parent
 RESULTS = ROOT / "results"
 OUT = ROOT / "report" / "assets"
+# the write-up figures: same data, compact frame, no in-figure title or footnote
+# (the paper carries those in its captions)
+PAPER = ROOT.parent.parent / "docs" / "final" / "assets" / "figures"
 
 RUN_ADV = RESULTS / "advertising_20260717T163332Z"
 RUN_FAC = RESULTS / "dwell_isobroadcast_20260806T155051Z"
@@ -63,6 +72,11 @@ def style():
         "axes.facecolor": SURFACE,
         "savefig.facecolor": SURFACE,
         "svg.fonttype": "none",
+        # maths (the paper's italic A) stays in the figure's own sans face
+        "mathtext.fontset": "custom",
+        "mathtext.rm": "sans",
+        "mathtext.it": "sans:italic",
+        "mathtext.bf": "sans:bold",
     })
 
 
@@ -73,6 +87,14 @@ def frame(ax, grid_axis="y"):
     ax.grid(True, axis=grid_axis, color=GRID, linewidth=1.0, linestyle="-")
     ax.set_axisbelow(True)
     ax.tick_params(length=0)
+
+
+def save_paper(fig, name):
+    """SVG only, into the paper's asset directory (the .typ includes SVG)."""
+    PAPER.mkdir(parents=True, exist_ok=True)
+    fig.savefig(PAPER / f"{name}.svg", bbox_inches="tight")
+    plt.close(fig)
+    print(f"wrote paper/{name}.svg")
 
 
 def save(fig, name):
@@ -478,8 +500,169 @@ def fig_paired_diffs():
     save(fig, "fig7-paired-differences")
 
 
+# -------------------------------------------------------------- paper figures
+# Compact re-cuts of three of the figures above for docs/final/final-paper.typ.
+# Same data, same palette; titles and footnotes drop out (the paper captions
+# carry them). A is the paper's symbol for the advertising interval.
+
+def paper_broadcasts_power():
+    """Paper fig. 3 — deliverability vs broadcasts per key, at two tx powers."""
+    g = defaultdict(lambda: [0, 0])
+    for run in RUN_BC:
+        for r in csv.DictReader(open(run / "resweep.csv")):
+            m = re.match(r"s\d+_p([pn])(\d+)_b(\d+)$", r["cell"])
+            if not m:
+                continue
+            dbm = (1 if m.group(1) == "p" else -1) * int(m.group(2))
+            k = (dbm, int(m.group(3)))
+            g[k][0] += int(r["delivered"])
+            g[k][1] += int(r["total"])
+    bcs = sorted({k[1] for k in g})
+    x = list(range(len(bcs)))
+
+    fig, ax = plt.subplots(figsize=(4.75, 3.35))
+    frame(ax)
+    for dbm, colour, lab in ((9, S1, "+9 dBm"), (-24, S2, "−24 dBm")):
+        y = [100 * g[(dbm, b)][0] / g[(dbm, b)][1] for b in bcs]
+        ax.plot(x, y, "-", color=colour, linewidth=2.0, zorder=2)
+        ax.plot(x, y, "o", color=colour, markersize=7, linestyle="none",
+                markeredgecolor=SURFACE, markeredgewidth=2, zorder=3)
+        ax.annotate(lab, (x[1], y[1]), textcoords="offset points",
+                    xytext=(6, 10 if dbm > 0 else -18), ha="left", color=colour,
+                    fontsize=10, fontweight="bold")
+        ax.annotate(f"{y[0]:.1f}%", (x[0], y[0]), textcoords="offset points",
+                    xytext=(0, 10 if dbm > 0 else -16), ha="center",
+                    color=INK_2, fontsize=9)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels([str(b) for b in bcs])
+    ax.set_yticks(range(40, 101, 10))          # the axis carries its own scale
+    ax.set_xlim(-0.35, len(bcs) - 0.75)
+    ax.set_ylim(35, 104)
+    ax.set_xlabel("broadcasts per key")
+    ax.set_ylabel("deliverability (%)")
+    ax.legend(handles=[Line2D([], [], color=S1, linewidth=2.4, label="+9 dBm"),
+                       Line2D([], [], color=S2, linewidth=2.4, label="−24 dBm")],
+              frameon=False, loc="lower right", fontsize=9)
+    save_paper(fig, "fig-broadcasts-power")
+
+
+def paper_adv_nulls():
+    """Paper fig. 4 — the 300 ms comb in the advertising-interval sweep."""
+    g = _comb_data()
+    advs = sorted({k[1] for k in g})
+    fig, ax = plt.subplots(figsize=(5.0, 3.3))
+    frame(ax)
+
+    for a in advs:
+        if a % 300 == 0:
+            ax.axvspan(a - 34, a + 34, color=GRID, linewidth=0, zorder=0)
+
+    for bc, colour in ((4, S2), (6, S1)):
+        y = [100 * g[(bc, a)][0] / g[(bc, a)][1] for a in advs]
+        ax.plot(advs, y, "-", color=colour, linewidth=2.0, zorder=2)
+        ax.plot(advs, y, "o", color=colour, markersize=6, linestyle="none",
+                markeredgecolor=SURFACE, markeredgewidth=2, zorder=3)
+        ax.annotate(f"{bc} broadcasts/key", (advs[-1], y[-1]),
+                    textcoords="offset points", xytext=(7, -3), ha="left",
+                    color=colour, fontsize=9, fontweight="bold")
+
+    # every level is labelled, so the labels are staggered on two rows and the
+    # 300 ms multiples are pulled out in ink — at one row they collide
+    ax.set_xticks(advs)
+    ax.set_xticklabels([str(a) for a in advs], fontsize=8)
+    for i, lab in enumerate(ax.get_xticklabels()):
+        if int(lab.get_text()) % 300 == 0:
+            lab.set_color(INK)
+            lab.set_fontweight("bold")
+        if i % 2:
+            lab.set_y(lab.get_position()[1] - 0.055)
+    ax.set_ylim(50, 103)
+    ax.set_xlim(150, 1450)
+    ax.set_xlabel("advertising interval $A$ (ms)", labelpad=8)
+    ax.set_ylabel("deliverability (%)")
+    ax.annotate("300 ms multiples", xy=(900, 53), ha="center",
+                color=INK_2, fontsize=9)
+    save_paper(fig, "fig-adv-nulls")
+
+
+def paper_phase_response():
+    """Paper fig. 5 — deliverability against phases reached, 300 / gcd(A, 300)."""
+    from math import gcd
+    g = defaultdict(lambda: [0, 0])
+    lev = defaultdict(set)
+    for bc, adv, d, t in _run6(bc_filter=4):
+        ph = 300 // gcd(adv, 300)
+        g[ph][0] += d; g[ph][1] += t; lev[ph].add(adv)
+    phases = sorted(g)
+    pct = [100 * g[k][0] / g[k][1] for k in phases]
+
+    fig, ax = plt.subplots(figsize=(5.35, 3.4))
+    frame(ax)
+    ax.vlines(phases, 0, pct, color=GRID, linewidth=2.0)   # true numeric x, so
+    ax.plot(phases, pct, "o", color=S1, markersize=9,      # the jump to 6 shows
+            markeredgecolor=SURFACE, markeredgewidth=2, linestyle="none")
+    for k, v in zip(phases, pct):
+        ax.annotate(f"{v:.1f}%", (k, v), textcoords="offset points",
+                    xytext=(0, 11), ha="center", color=INK_2, fontsize=9,
+                    fontweight="bold")
+        levels = sorted(lev[k])
+        ax.annotate("$A$ = " + ",\n".join(str(a) for a in levels) + " ms",
+                    (k, 3), ha="center", va="bottom", color=MUTED, fontsize=8)
+
+    ax.set_xticks(phases)
+    ax.set_xticklabels([str(k) for k in phases])
+    ax.set_xlim(0.4, 6.6)
+    ax.set_ylim(0, 100)
+    ax.set_xlabel("distinct positions in the scan cycle reached,  300 / gcd($A$, 300)")
+    ax.set_ylabel("deliverability (%)")
+    save_paper(fig, "fig-phase-response")
+
+
+def paper_escape_curve():
+    """Paper fig. 6 — a locked interval does not escape with broadcast count."""
+    g = defaultdict(lambda: [0, 0])
+    for bc, adv, d, t in _run6():
+        if adv in (500, 600) and bc in (4, 8, 16):
+            g[(adv, bc)][0] += d; g[(adv, bc)][1] += t
+    bcs = [4, 8, 16]
+    x = list(range(len(bcs)))
+
+    fig, ax = plt.subplots(figsize=(4.75, 3.35))
+    frame(ax)
+    labels = ((500, S1, "$A$ = 500 ms (3 positions)"),
+              (600, S2, "$A$ = 600 ms (1 position, locked)"))
+    for adv, colour, _lab in labels:
+        y = [100 * g[(adv, b)][0] / g[(adv, b)][1] for b in bcs]
+        ax.plot(x, y, "-", color=colour, linewidth=2.0, zorder=2)
+        ax.plot(x, y, "o", color=colour, markersize=7, linestyle="none",
+                markeredgecolor=SURFACE, markeredgewidth=2, zorder=3)
+        for i, v in enumerate(y):
+            ax.annotate(f"{v:.1f}%", (i, v), textcoords="offset points",
+                        xytext=(0, 10 if adv == 500 else -17), ha="center",
+                        color=INK_2, fontsize=9)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels([str(b) for b in bcs])
+    ax.set_yticks(range(40, 101, 10))
+    ax.set_xlim(-0.35, len(bcs) - 0.65)
+    ax.set_ylim(37, 110)
+    ax.set_xlabel("broadcasts per key")
+    ax.set_ylabel("deliverability (%)")
+    ax.legend(handles=[Line2D([], [], color=c, linewidth=2.4, label=lab)
+                       for _a, c, lab in labels],
+              frameon=False, loc="lower right", fontsize=9)
+    save_paper(fig, "fig-escape-curve")
+
+
 if __name__ == "__main__":
     style()
+    if len(sys.argv) > 1 and sys.argv[1] == "paper":
+        paper_broadcasts_power()
+        paper_adv_nulls()
+        paper_phase_response()
+        paper_escape_curve()
+        raise SystemExit
     fig_adv_comb()           # figure 1
     fig_broadcast_delivery() # figure 6
     fig_phase_response()     # figure 7
