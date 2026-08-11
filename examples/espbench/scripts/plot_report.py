@@ -90,9 +90,13 @@ def frame(ax, grid_axis="y"):
 
 
 def save_paper(fig, name):
-    """SVG only, into the paper's asset directory (the .typ includes SVG)."""
+    """SVG only, into the paper's asset directory (the .typ includes SVG).
+
+    Transparent: the paper's page supplies the surface, so the figures must
+    not carry their own tint.
+    """
     PAPER.mkdir(parents=True, exist_ok=True)
-    fig.savefig(PAPER / f"{name}.svg", bbox_inches="tight")
+    fig.savefig(PAPER / f"{name}.svg", bbox_inches="tight", transparent=True)
     plt.close(fig)
     print(f"wrote paper/{name}.svg")
 
@@ -655,6 +659,134 @@ def paper_escape_curve():
     save_paper(fig, "fig-escape-curve")
 
 
+def paper_scan_schematic():
+    """Paper fig. — why a 300 ms multiple locks: scan-cycle geometry, schematic.
+
+    Not data: window width and starting offset are illustrative. The scanner
+    row shows the open windows; the two advertiser rows show where each event
+    lands relative to them, read off vertically through the full-height bands.
+    """
+    win, cyc, t_end = 100, 300, 3000
+    fig, ax = plt.subplots(figsize=(5.8, 2.8))
+    for side in ("top", "right", "left"):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(length=0)
+
+    for s in range(0, t_end, cyc):
+        ax.axvspan(s, s + win, color=GRID, linewidth=0, zorder=0)
+        ax.broken_barh([(s, win)], (1.79, 0.42), color=BLUE_250,
+                       linewidth=0, zorder=2)
+
+    for y, A, colour in ((1.0, 500, S1), (0.2, 600, S2)):
+        events = list(range(150, t_end - 60, A))
+        heard = [t for t in events if t % cyc < win]
+        ax.vlines(events, y - 0.16, y + 0.16, color=colour, linewidth=2.2,
+                  zorder=3)
+        ax.plot(heard, [y + 0.31] * len(heard), "o", color=colour,
+                markersize=5, linestyle="none", zorder=3)
+
+    ax.annotate("scan window (open)", xy=(50, 2.24), xytext=(330, 2.52),
+                color=MUTED, fontsize=8, va="center",
+                arrowprops=dict(arrowstyle="->", color=MUTED, linewidth=1.0))
+    ax.annotate("lands in a window — heard", xy=(650, 1.35), xytext=(890, 1.62),
+                color=INK_2, fontsize=8, va="center",
+                arrowprops=dict(arrowstyle="->", color=MUTED, linewidth=1.0))
+    ax.annotate("same position every event — never heard", xy=(2550, 0.38),
+                xytext=(2080, 0.62), ha="center", va="center", color=INK_2,
+                fontsize=8,
+                arrowprops=dict(arrowstyle="->", color=MUTED, linewidth=1.0))
+
+    ax.set_yticks([2.0, 1.0, 0.2])
+    ax.set_yticklabels(["scanner", "$A$ = 500 ms\n(unlocked)",
+                        "$A$ = 600 ms\n(locked)"], fontsize=9)
+    ax.set_xticks(range(0, t_end + 1, 600))
+    ax.set_xlim(-40, t_end + 40)
+    ax.set_ylim(-0.25, 2.72)
+    ax.set_xlabel("time (ms)")
+    save_paper(fig, "fig-scan-schematic")
+
+
+def _goodput_data(run):
+    """Per-condition (adv_ms, dwell_ms) deliverability and delivered goodput.
+
+    Deliverability is the offline resweep's, never the live poller's; goodput
+    divides those same deliveries by the cells' measured send window, so both
+    axes come from one source. The run's anchors sit at full power, so they are
+    dropped -- everything returned here is the -24 dBm arm.
+    """
+    sw = {r["cell"]: (int(r["delivered"]), int(r["total"]))
+          for r in csv.DictReader(open(run / "resweep.csv"))}
+    g = defaultdict(lambda: [0, 0, 0.0])
+    for r in csv.DictReader(open(run / "summary.csv")):
+        if r["name"] not in sw or not r["send_seconds"] or not r["tx_power_dbm"]:
+            continue
+        if int(float(r["tx_power_dbm"])) != -24:
+            continue
+        d, t = sw[r["name"]]
+        k = (int(r["adv_interval_ms"]), int(r["update_interval_ms"]))
+        g[k][0] += d
+        g[k][1] += t
+        g[k][2] += float(r["send_seconds"])
+    return g
+
+
+def _pareto(points):
+    """Non-dominated points, walking from the most reliable to the fastest.
+
+    `points` are (deliverability, goodput, ...) tuples; a point survives if no
+    other point beats it on both axes at once.
+    """
+    out, best = [], -1.0
+    for p in sorted(points, key=lambda p: -p[0]):
+        if p[1] > best:
+            out.append(p)
+            best = p[1]
+    return out
+
+
+def paper_goodput_frontier():
+    """Paper fig. 9 -- rate against reliability, and the frontier they trace."""
+    g = _goodput_data(RUN_COMB)
+    pts = [(d / t, d / s, adv, dwell) for (adv, dwell), (d, t, s) in g.items()]
+    front = _pareto(pts)
+
+    fig, ax = plt.subplots(figsize=(5.2, 3.5))
+    frame(ax, grid_axis="both")
+
+    ax.plot([100 * p[0] for p in front], [p[1] for p in front], "-",
+            color=AXIS, linewidth=1.5, zorder=1)
+
+    groups = ((S2, "$A$ a multiple of 300 ms", lambda p: p[2] % 300 == 0),
+              (S1, "other $A$", lambda p: p[2] % 300 != 0))
+    for colour, _lab, keep in groups:
+        sel = [p for p in pts if keep(p)]
+        ax.plot([100 * p[0] for p in sel], [p[1] for p in sel], "o",
+                color=colour, markersize=7, linestyle="none",
+                markeredgecolor=SURFACE, markeredgewidth=1.6, zorder=3)
+
+    # only the frontier is annotated; labelling all 26 conditions is unreadable.
+    # offsets are hand-placed to clear both the frontier line and the cloud
+    offsets = ((0, -15, "center"), (9, -1, "left"), (-8, 7, "right"))
+    for (dl, gp, adv, dwell), (dx, dy, ha) in zip(front, offsets):
+        ax.annotate(f"$A$ = {adv} ms, $T$ = {dwell / 1000:g} s",
+                    (100 * dl, gp), textcoords="offset points",
+                    xytext=(dx, dy), ha=ha, color=INK_2, fontsize=8.5)
+
+    ax.set_yscale("log")
+    ax.set_yticks([0.1, 0.2, 0.5, 1.0])
+    ax.set_yticklabels(["0.1", "0.2", "0.5", "1.0"])
+    ax.yaxis.set_minor_locator(plt.NullLocator())
+    ax.set_xlim(54, 106)
+    ax.set_ylim(0.08, 1.75)
+    ax.set_xlabel("deliverability (%)")
+    ax.set_ylabel("delivered goodput (byte/s)")
+    ax.legend(handles=[Line2D([], [], color=c, marker="o", linestyle="none",
+                              markersize=7, label=lab)
+                       for c, lab, _k in groups],
+              frameon=False, loc="lower left", fontsize=9)
+    save_paper(fig, "fig-goodput-frontier")
+
+
 if __name__ == "__main__":
     style()
     if len(sys.argv) > 1 and sys.argv[1] == "paper":
@@ -662,6 +794,8 @@ if __name__ == "__main__":
         paper_adv_nulls()
         paper_phase_response()
         paper_escape_curve()
+        paper_scan_schematic()
+        paper_goodput_frontier()
         raise SystemExit
     fig_adv_comb()           # figure 1
     fig_broadcast_delivery() # figure 6
