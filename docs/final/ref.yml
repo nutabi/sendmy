@@ -13,46 +13,6 @@ heinrich2021who:
     volume: 2021
     issue: 3
 
-ren2026snatcher:
-  type: Article
-  title: "Snatcher: Apple Find My Network Exposes Your Lost Devices To Strangers"
-  author: ["Ren, Zhenyu", "Zhang, Yanbo", "Liu, Boya", "Li, Mo"]
-  date: 2026-06-19
-  serial-number:
-    arxiv: "2606.21067"
-  url:
-    value: "https://arxiv.org/abs/2606.21067"
-  parent:
-    type: Proceedings
-    title: "ACM SIGSAC Conference on Computer and Communications Security"
-    acronym: CCS
-
-gangwal2022blewhisperer:
-  type: Article
-  title: "BLEWhisperer: Exploiting BLE Advertisements for Data Exfiltration"
-  author: ["Gangwal, Ankit", "Singh, Shubham", "Spolaor, Riccardo", "Srivastava, Abhijeet"]
-  date: 2022-09-26
-  serial-number:
-    doi: "10.1007/978-3-031-17140-6_34"
-    arxiv: "2204.08042"
-  parent:
-    type: Conference
-    title: "European Symposium on Research in Computer Security (ESORICS)"
-    acronym: ESORICS
-    location: "Copenhagen, Denmark"
-
-alamleh2026defending:
-  type: Article
-  title: "Defending against BLE-based covert channels in crowdsourced location networks"
-  author: ["Alamleh, Hosam", "Cantelli-Forti, Alessandro"]
-  date: 2026-05
-  serial-number:
-    doi: "10.1016/j.cose.2026.104426"
-  parent:
-    type: Periodical
-    title: "Computers & Security"
-    volume: 164
-
 krawczyk2010hkdf:
   type: Report
   title: "RFC 5869: HMAC-based Extract-and-Expand Key Derivation Function (HKDF)"
@@ -74,17 +34,6 @@ kbc1997hmac:
     rfc: "2104"
   url:
     value: "https://datatracker.ietf.org/doc/html/rfc2104"
-
-rfc9380h2c:
-  type: Report
-  title: "RFC 9380: Hashing to Elliptic Curves"
-  author: ["Faz-Hernández, Armando", "Scott, Sam", "Sullivan, Nick", "Wahby, Riad S.", "Wood, Christopher A."]
-  date: 2023-08
-  organization: "Internet Engineering Task Force"
-  serial-number:
-    rfc: "9380"
-  url:
-    value: "https://datatracker.ietf.org/doc/html/rfc9380"
 
 nist2022discrete:
   type: Report
@@ -132,3 +81,30 @@ espressif2024espidf:
   url:
     value: "https://docs.espressif.com/projects/esp-idf/en/latest/esp32/"
     date: 2026-08-09
+
+apple2020platform:
+  type: Web
+  title: "Apple Platform Security"
+  author: ["Apple Inc."]
+  date: 2020
+  organization: "Apple Inc."
+  url:
+    value: "https://support.apple.com/guide/security/"
+    date: 2020-10-10
+
+espressif2019espnimble:
+  type: Repository
+  title: "esp-nimble: Espressif Port of the Apache Mynewt NimBLE Bluetooth Low Energy Stack"
+  author: ["Espressif Systems"]
+  date: 2019-03
+  organization: "Espressif Systems"
+  url:
+    value: "https://github.com/espressif/esp-nimble"
+
+mackay2022microecc:
+  type: Repository
+  title: "micro-ecc: ECDH and ECDSA for 8-bit, 32-bit, and 64-bit Processors"
+  author: ["MacKay, Kenneth"]
+  date: 2022-01
+  url:
+    value: "https://github.com/kmackay/micro-ecc"
