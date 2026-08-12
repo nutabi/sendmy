@@ -3,7 +3,6 @@ description: Link layer of the sendmy protocol
 tags:
   - ble
   - nimble
-  - findmy
   - offline-finding
   - esp32
 dependencies:

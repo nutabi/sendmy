@@ -1,0 +1,808 @@
+{
+  "port": "/dev/cu.usbmodem101",
+  "settle_seconds": 900,
+  "report_floor_skew_s": 120,
+  "mid_gap": 100,
+  "deliver_window_s": null,
+  "detection": {
+    "poll": true,
+    "poll_interval_s": 30,
+    "detections_before_remove": 1,
+    "fast_timeout_s": 600,
+    "sweep_interval_s": 900,
+    "sweep_max_passes": 4,
+    "queue_soft_cap": 256
+  },
+  "density": {
+    "enabled": true,
+    "interval_s": 30,
+    "window_s": 10
+  },
+  "_note": "RUN 1 of the series -- TX power x dwell. Resolves the confound left by the old TX-power x rotation run, whose every arm was attenuated (-12..-24 dBm) and which therefore established flatness only WITHIN the attenuated tail while attributing its large rotation effect (80/92/99% at 4/8/16s) to dwell alone. Here dwell 2/4/8s crosses TX {+9 dBm full, -24 dBm floor}, 6 conditions x 15 reps = 90 cells, 6-cell blocks cycling all conditions so diurnal drift is balanced. adv scales with dwell to hold broadcasts-per-key at 5 -- the series' standard transmit axis, identical to the dwell factorial and to run 4 -- so dwell means the same thing here as it does there. ~2.7h transmit. Second and larger purpose: every full-power run so far has sat on the delivery ceiling, where no parameter can be measured; this run establishes attenuation as a deliberate dial for getting below it, and run 4 then uses whichever arm lands off the ceiling. Ground truth: resweep.py. ANTENNA STATE: directional antenna REMOVED. The directional antenna cannot be switched under program control, so it is a BETWEEN-RUN block, not an interleaved factor. Run this file and its counterpart back to back on one night, then REVERSE the order on a second night, so antenna state is crossed against time-of-night rather than confounded with it. The txdbm axis inside each run is interleaved and therefore clean on its own, and the anchor cells measure what the antenna itself is worth: the same reference condition runs in both states. ANCHOR CELLS: cells named a###_ref are the series' shared reference condition (incremental, adv 1s, 8s dwell, 20 windows, +9 dBm) -- the same cell the density matrix repeats 120 times. One opens every run and one follows every few blocks, ~10% of the run. They are not part of this matrix's design; they exist so any two nights can be compared against a condition they actually share, and so a night whose ambient density was unusual announces itself instead of silently biasing the comparison. Analyse them across runs first, then read the run's own contrast.",
+  "cells": [
+    {
+      "name": "a000_ref",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s000_pp09_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s001_pn24_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s002_pp09_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s003_pn24_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s004_pp09_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s005_pn24_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s006_pp09_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s007_pn24_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s008_pp09_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s009_pn24_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s010_pp09_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s011_pn24_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "a001_ref",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s012_pp09_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s013_pn24_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s014_pp09_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s015_pn24_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s016_pp09_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s017_pn24_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s018_pp09_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s019_pn24_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s020_pp09_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s021_pn24_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s022_pp09_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s023_pn24_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "a002_ref",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s024_pp09_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s025_pn24_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s026_pp09_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s027_pn24_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s028_pp09_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s029_pn24_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s030_pp09_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s031_pn24_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s032_pp09_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s033_pn24_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s034_pp09_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s035_pn24_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "a003_ref",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s036_pp09_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s037_pn24_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s038_pp09_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s039_pn24_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s040_pp09_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s041_pn24_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s042_pp09_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s043_pn24_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s044_pp09_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s045_pn24_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s046_pp09_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s047_pn24_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "a004_ref",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s048_pp09_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s049_pn24_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s050_pp09_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s051_pn24_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s052_pp09_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s053_pn24_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s054_pp09_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s055_pn24_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s056_pp09_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s057_pn24_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s058_pp09_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s059_pn24_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "a005_ref",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s060_pp09_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s061_pn24_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s062_pp09_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s063_pn24_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s064_pp09_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s065_pn24_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s066_pp09_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s067_pn24_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s068_pp09_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s069_pn24_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s070_pp09_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s071_pn24_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "a006_ref",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s072_pp09_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s073_pn24_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s074_pp09_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s075_pn24_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s076_pp09_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s077_pn24_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s078_pp09_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s079_pn24_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s080_pp09_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s081_pn24_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s082_pp09_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s083_pn24_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "a007_ref",
+      "mode": "incremental",
+      "adv_interval_ms": 1000,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s084_pp09_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s085_pn24_d02",
+      "mode": "incremental",
+      "adv_interval_ms": 400,
+      "update_interval_ms": 2000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s086_pp09_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s087_pn24_d04",
+      "mode": "incremental",
+      "adv_interval_ms": 800,
+      "update_interval_ms": 4000,
+      "count": 20,
+      "tx_power_dbm": -24
+    },
+    {
+      "name": "s088_pp09_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": 9
+    },
+    {
+      "name": "s089_pn24_d08",
+      "mode": "incremental",
+      "adv_interval_ms": 1600,
+      "update_interval_ms": 8000,
+      "count": 20,
+      "tx_power_dbm": -24
+    }
+  ]
+}

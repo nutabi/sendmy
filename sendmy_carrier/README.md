@@ -85,7 +85,7 @@ sm_ll_set_key(carrier);
 
 ## Why the carrier is a valid P-224 point
 
-A Find My advertising key is not an arbitrary 28-byte string — it is the
+An OF advertising key is not an arbitrary 28-byte string — it is the
 x-coordinate of a NIST P-224 (secp224r1) public key. A finder that hears the
 advertisement reconstructs the point and uses it (ECDH) to encrypt its location
 report. A raw HMAC-SHA256 truncation lands on a valid x-coordinate only about

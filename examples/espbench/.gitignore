@@ -1,0 +1,32 @@
+# Claude instruction/memory
+.claude/
+CLAUDE.md
+
+# CMake build
+build/
+.cache/
+managed_components/
+
+# Configuration
+sdkconfig*
+!sdkconfig.defaults
+dependencies.lock
+
+# Python bytecode (run_matrix.py now lives at the espbench root)
+__pycache__/
+
+# MacOS
+.DS_Store
+
+# Secrets
+uid.hex
+
+# Run artifacts under results/ are never tracked: many carry sensitive data
+# (per-cell uid.hex is the device secret, result.json/summary.json embed that
+# uid, and result.json/timeseries/detection.csv carry decrypted GPS), and even
+# the aggregates are large, run-specific, and re-derivable from the raw series.
+# Keep the whole directory out of version control.
+results/
+
+# Generated report (rebuild: pandoc espbench-report.md -o espbench-report.html --standalone --embed-resources --toc)
+report/*.html

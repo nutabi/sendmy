@@ -8,12 +8,12 @@ non-discoverable broadcaster.
 
 ## The advertisement
 
-Apple's OF format is a BLE manufacturer-specific record (AD type `0xFF`, company
-`0x004C`). `sendmy_link` lays the 28-byte key across the random address and the
+The OF advertising format is a BLE manufacturer-specific record (AD type `0xFF`,
+company `0x004C`). `sendmy_link` lays the 28-byte key across the random address and the
 manufacturer payload exactly as a real tag does:
 
 ```
-1e ff 4c 00   AD header + Apple company ID
+1e ff 4c 00   AD header + company ID
 12            OF type (offline finding)
 19            payload length = 25
 00            status byte
@@ -29,24 +29,35 @@ payload, a receiver can reconstruct all 28 bytes.
 
 ## API
 
-The whole surface is two functions and one constant (`SM_LL_KEY_LEN`, 28):
+The whole surface is four functions and two constants (`SM_LL_KEY_LEN`, 28, and
+`SM_LL_DEFAULT_ADV_INTERVAL_MS`, 1000):
 
 ```c
-esp_err_t sm_ll_init(void (*on_ready)(void), uint32_t adv_interval_ms);
+esp_err_t sm_ll_init(void (*on_ready)(void));
 esp_err_t sm_ll_set_key(const uint8_t key[28]);
+esp_err_t sm_ll_set_tx_power(int8_t dbm);
+esp_err_t sm_ll_set_adv_interval(uint32_t adv_interval_ms);
 ```
 
 `sm_ll_init` brings up the NimBLE host task and returns immediately. Once the
 host has synced with the controller it calls `on_ready` (once), which is your
-cue that `sm_ll_set_key` will actually take effect. `adv_interval_ms` must be in
-`[20, 10240]` (the spec's range in 0.625 ms units); anything else is rejected up
-front with `ESP_ERR_INVALID_ARG`.
+cue that `sm_ll_set_key` will actually take effect. It starts at
+`SM_LL_DEFAULT_ADV_INTERVAL_MS`; call `sm_ll_set_adv_interval` afterwards to
+change the cadence.
 
 `sm_ll_set_key` is thread-safe. It copies the key under a NimBLE mutex and posts
 an event to the host task, which stops the current advertisement, derives the
 new random address, rebuilds the payload, and restarts. Calling it before
 `sm_ll_init` returns `ESP_ERR_INVALID_STATE`. You can call it as often as you
 like; each call rotates the advertised identity.
+
+`sm_ll_set_adv_interval` sets how often a legacy advertising event fires.
+`adv_interval_ms` must be in `[20, 10240]` (the spec's range in 0.625 ms units);
+anything else is rejected with `ESP_ERR_INVALID_ARG`, and calling before init
+returns `ESP_ERR_INVALID_STATE`. The value takes effect on the next
+advertisement (each `sm_ll_set_key` re-applies it), so set it before publishing a
+key. `sm_ll_set_tx_power` likewise takes effect on the next advertisement; see
+the header for its dBm quantisation.
 
 ## Using it
 
@@ -89,7 +100,8 @@ static void on_ready(void) {
 }
 
 void app_main(void) {
-    sm_ll_init(on_ready, 1000);  // advertise every 1000 ms
+    sm_ll_init(on_ready);                 // defaults to 1000 ms
+    sm_ll_set_adv_interval(1000);         // (optional) change the cadence
 }
 ```
 

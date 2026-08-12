@@ -1,0 +1,110 @@
+heinrich2021who:
+  type: Article
+  title: "Who Can Find My Devices? Security and Privacy of Apple's Crowd-Sourced Bluetooth Location Tracking System"
+  author: ["Heinrich, Alexander", "Stute, Milan", "Kornhuber, Tim", "Hollick, Matthias"]
+  date: 2021-03-03
+  serial-number:
+    doi: "10.2478/popets-2021-0045"
+    arxiv: "2103.02282"
+  page-range: "227-245"
+  parent:
+    type: Periodical
+    title: "Proceedings on Privacy Enhancing Technologies (PoPETs)"
+    volume: 2021
+    issue: 3
+
+krawczyk2010hkdf:
+  type: Report
+  title: "RFC 5869: HMAC-based Extract-and-Expand Key Derivation Function (HKDF)"
+  author: ["Krawczyk, Hugo", "Eronen, Pasi"]
+  date: 2010-05
+  organization: "Internet Engineering Task Force"
+  serial-number:
+    rfc: "5869"
+  url:
+    value: "https://datatracker.ietf.org/doc/html/rfc5869"
+
+kbc1997hmac:
+  type: Report
+  title: "RFC 2104: HMAC: Keyed-Hashing for Message Authentication"
+  author: ["Krawczyk, Hugo", "Bellare, Mihir", "Canetti, Ran"]
+  date: 1997-02
+  organization: "Internet Engineering Task Force"
+  serial-number:
+    rfc: "2104"
+  url:
+    value: "https://datatracker.ietf.org/doc/html/rfc2104"
+
+nist2022discrete:
+  type: Report
+  title: "SP 800-186: Recommendations for Discrete Logarithm-based Cryptography — Elliptic Curve Domain Parameters"
+  author: ["Chen, Lily", "Moody, Dustin", "Regenscheid, Andrew", "Robinson, Angela", "Randall, Karen"]
+  date: 2023-02
+  organization: "National Institute of Standards and Technology"
+  serial-number:
+    doi: "10.6028/NIST.SP.800-186"
+  url:
+    value: "https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-186.pdf"
+
+bluetooth2023core:
+  type: Report
+  title: "Bluetooth Core Specification, Version 5.4"
+  author: ["Bluetooth SIG"]
+  date: 2023-01-31
+  organization: "Bluetooth Special Interest Group"
+  url:
+    value: "https://www.bluetooth.com/specifications/specs/core-specification/"
+
+seemoo2021openhaystack:
+  type: Repository
+  title: "OpenHaystack: Build Your Own Find My Network"
+  author: ["Heinrich, Alexander", "Stute, Milan"]
+  date: 2021-03
+  organization: "Secure Mobile Networking Lab, TU Darmstadt"
+  url:
+    value: "https://github.com/seemoo-lab/openhaystack"
+
+positivesecurity2022sendmy:
+  type: Blog
+  title: "Send My: Arbitrary Data Transmission via Apple's Find My Network"
+  author: ["Bräunlein, Fabian"]
+  date: 2022-05-11
+  publisher: "Positive Security"
+  url:
+    value: "https://positive.security/blog/send-my"
+
+espressif2024espidf:
+  type: Web
+  title: "ESP-IDF Programming Guide"
+  author: ["Espressif Systems"]
+  organization: "Espressif Systems"
+  url:
+    value: "https://docs.espressif.com/projects/esp-idf/en/latest/esp32/"
+    date: 2026-08-09
+
+apple2020platform:
+  type: Web
+  title: "Apple Platform Security"
+  author: ["Apple Inc."]
+  date: 2020
+  organization: "Apple Inc."
+  url:
+    value: "https://support.apple.com/guide/security/"
+    date: 2020-10-10
+
+espressif2019espnimble:
+  type: Repository
+  title: "esp-nimble: Espressif Port of the Apache Mynewt NimBLE Bluetooth Low Energy Stack"
+  author: ["Espressif Systems"]
+  date: 2019-03
+  organization: "Espressif Systems"
+  url:
+    value: "https://github.com/espressif/esp-nimble"
+
+mackay2022microecc:
+  type: Repository
+  title: "micro-ecc: ECDH and ECDSA for 8-bit, 32-bit, and 64-bit Processors"
+  author: ["MacKay, Kenneth"]
+  date: 2022-01
+  url:
+    value: "https://github.com/kmackay/micro-ecc"

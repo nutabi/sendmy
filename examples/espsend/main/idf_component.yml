@@ -5,3 +5,4 @@ dependencies:
     path: ../../../sendmy_link
   sendmy_carrier:
     path: ../../../sendmy_carrier
+  espressif/bme280: =*

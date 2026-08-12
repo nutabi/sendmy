@@ -12,7 +12,7 @@
 
 // Epoch length: how often the tag rotates and the advertised identifier
 // changes. Configured via CONFIG_ESPTAG_ROTATE_INTERVAL_MS (esptag
-// configuration menu, default 15 min to match the Find My cadence); drop it to
+// configuration menu, default 15 min to match the reference locator cadence); drop it to
 // a few seconds to observe rotation while testing.
 #define ROTATE_INTERVAL_MS CONFIG_ESPTAG_ROTATE_INTERVAL_MS
 
@@ -51,8 +51,13 @@ status_t ble_adv_init(tag_t *tag)
 #endif  // CONFIG_ESPTAG_ROTATE_ENABLE
 
     // sendmy_link is a standalone component returning esp_err_t; collapse it to
-    // the firmware's status_t convention at this boundary.
-    return sm_ll_init(on_ready, CONFIG_ESPTAG_ADV_INTERVAL_MS) == ESP_OK ? STATUS_OK : STATUS_ERR;
+    // the firmware's status_t convention at this boundary. The advertising
+    // interval is now a runtime setter, applied here right after init and before
+    // the first key is published in on_ready.
+    if (sm_ll_init(on_ready) != ESP_OK) {
+        return STATUS_ERR;
+    }
+    return sm_ll_set_adv_interval(CONFIG_ESPTAG_ADV_INTERVAL_MS) == ESP_OK ? STATUS_OK : STATUS_ERR;
 }
 
 /* Static helper implementation */

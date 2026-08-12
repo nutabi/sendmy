@@ -16,7 +16,7 @@ This document will be updated manually after each milestone is achieved.
 
 **Status: Completed**
 
-### Week 4 - 5: OF & AirTag Implementation on ESP32 (4 - 17 June)
+### Week 4 - 5: OF & Locator-Tag Implementation on ESP32 (4 - 17 June)
 
 **Status: Completed**
 
