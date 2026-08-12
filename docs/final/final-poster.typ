@@ -310,10 +310,13 @@
         fill: white,
         radius: 2mm,
         inset: 2.5mm,
-        tiaoma.qrcode("https://github.com/nutabi/sendmy", options: (scale: 3.6)),
+        tiaoma.qrcode(
+          "https://github.com/nutabi/sendmy/blob/main/docs/final/final-paper.pdf",
+          options: (scale: 3.6),
+        ),
       )
       v(2mm)
-      text(size: 15pt, fill: pale)[github.com/nutabi/sendmy]
+      text(size: 15pt, fill: pale)[the full report]
     }),
   ),
 )
