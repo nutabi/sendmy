@@ -48,7 +48,7 @@
     text(size: 42pt, weight: "bold", fill: accent)[#title]
     v(4mm, weak: true)
     line(length: 100%, stroke: 3pt + accent)
-    v(6mm, weak: true)
+    v(4mm, weak: true)
     body
   },
 )
@@ -69,7 +69,9 @@
   text(size: size, fill: ink, body),
 )
 
-#let stat(value, unit, label, accent: blue) = block(
+// `size` scales the unit with the value so the pairing keeps its proportions.
+// Labels are meant to sit on one line: widen the column rather than shrink them.
+#let stat(value, unit, label, accent: blue, size: 76pt) = block(
   width: 100%,
   height: 100%,
   fill: card-bg,
@@ -77,11 +79,11 @@
   stroke: 0.8pt + hair,
   inset: (x: 10mm, y: 8mm),
   {
-    text(size: 96pt, weight: "bold", fill: accent)[#value]
-    if unit != none { text(size: 46pt, weight: "bold", fill: accent)[ #unit] }
-    v(1mm, weak: true)
+    text(size: size, weight: "bold", fill: accent)[#value]
+    if unit != none { text(size: size * 0.48, weight: "bold", fill: accent)[ #unit] }
+    v(8mm, weak: true)
     set par(leading: 0.5em)
-    text(size: 24pt, fill: muted)[#label]
+    text(size: 22pt, fill: muted)[#label]
   },
 )
 
@@ -99,7 +101,11 @@
 // -------------------------------------------------------------- diagrams --
 
 // The channel, end to end: 50 units wide, drawn to fill the content width.
-#let hero-diagram = cetz.canvas(length: 9.7mm, {
+// Type scales with the unit: the stage boxes are a fixed number of units wide,
+// so fixed point sizes would overflow them as soon as the unit shrinks.
+#let hero-unit = 7.8mm
+#let hero-scale = hero-unit / 9.7mm
+#let hero-diagram = cetz.canvas(length: hero-unit, {
   import cetz.draw: *
 
   let stage(x, n, title, body, accent) = {
@@ -108,16 +114,16 @@
     content(
       (x + 0.55, -1.0),
       anchor: "north-west",
-      text(size: 17pt, weight: "bold", fill: accent)[#n],
+      text(size: 17pt * hero-scale, weight: "bold", fill: accent)[#n],
     )
     content(
       (x + 0.55, -1.85),
       anchor: "north-west",
-      box(width: 8.06 * 9.7mm, text(size: 25pt, weight: "bold")[#title]),
+      box(width: 8.06 * hero-unit, text(size: 25pt * hero-scale, weight: "bold")[#title]),
     )
-    content((x + 0.55, -2.75), anchor: "north-west", box(width: 8.06 * 9.7mm, {
+    content((x + 0.55, -2.75), anchor: "north-west", box(width: 8.06 * hero-unit, {
       set par(leading: 0.5em)
-      text(size: 20pt, fill: muted, body)
+      text(size: 20pt * hero-scale, fill: muted, body)
     }))
   }
 
@@ -130,12 +136,12 @@
     content(
       ((x1 + x2) / 2, 0.4),
       anchor: "south",
-      box(width: 8.4 * 9.7mm, align(center, {
+      box(width: 8.4 * hero-unit, align(center, {
         set par(leading: 0.5em)
-        text(size: 21pt, weight: "bold", fill: ink)[#label]
+        text(size: 21pt * hero-scale, weight: "bold", fill: ink)[#label]
         if sub != none {
           linebreak()
-          text(size: 20pt, weight: "bold", fill: orange)[#sub]
+          text(size: 20pt * hero-scale, weight: "bold", fill: orange)[#sub]
         }
       })),
     )
@@ -160,7 +166,7 @@
   content((25, -4.9), box(
     fill: card-bg,
     inset: (x: 5mm, y: 1mm),
-    text(size: 21pt, fill: faint)[no acknowledgement],
+    text(size: 21pt * hero-scale, fill: faint)[no acknowledgement],
   ))
 })
 
@@ -170,7 +176,7 @@
   width: 100%,
   fill: dark,
   radius: 4mm,
-  inset: (x: 13mm, y: 8mm),
+  inset: (x: 13mm, y: 7mm),
   grid(
     columns: (1fr, auto),
     column-gutter: 12mm,
@@ -179,12 +185,12 @@
       text(size: 19pt, weight: "bold", fill: pale, tracking: 2.5pt)[
         CP2107 #h(0.8em) · #h(0.8em) AUGUST 2026 #h(0.8em) · #h(0.8em) NGUYEN THAI BINH
       ]
-      v(5mm)
-      text(size: 58pt, weight: "bold", fill: white)[
+      v(4mm)
+      text(size: 52pt, weight: "bold", fill: white)[
         A Data Channel over the Find My Network
       ]
-      v(5mm)
-      text(size: 30pt, fill: rgb("#cfcdc6"))[
+      v(4mm)
+      text(size: 28pt, fill: rgb("#cfcdc6"))[
         Hundreds of millions of finder devices relay beacons for anyone.
         #text(fill: white, weight: "bold")[What kind of channel is it?]
       ]
@@ -205,20 +211,23 @@
   ),
 )
 
-#v(6mm)
+#v(4mm)
 
 // ------------------------------------------------------------ stat strip --
 
+// Columns are sized to the widest line each card has to hold — usually the
+// label, but the goodput card is set by its ranged value plus unit.
 #grid(
-  columns: (1fr,) * 3,
+  columns: (0.94fr, 0.96fr, 0.88fr, 1.22fr),
   column-gutter: 6mm,
-  rows: 50mm,
-  stat([−25], [%], [deliverability at intervals multiple of 300 ms], accent: orange),
+  rows: 52mm,
+  stat([>99.5], [%], [deliverability at full power]),
   stat([0], none, [payload bytes ever corrupted]),
-  stat([158], [s], [median broadcast-to-report delay]),
+  stat([158], [s], [broadcast-to-report delay], accent: orange),
+  stat([0.06--1.2], [byte/s], [goodput, trading against reliability]),
 )
 
-#v(6mm)
+#v(4mm)
 
 // ------------------------------------------------------------------- hero --
 
@@ -261,13 +270,13 @@
       fig(
         "assets/figures/fig-adv-nulls.svg",
         [Advertising interval $A$, 200--1400 ms at $-24$ dBm.],
-        width: 92%,
+        width: 62%,
       ),
     )
   },
 )
 
-#v(5mm)
+#v(4mm)
 
 // ---------------------------------------------------------------- columns --
 
@@ -287,7 +296,7 @@
     #fig(
       "assets/figures/fig-scan-schematic.svg",
       [Scan-cycle geometry; window and offset illustrative.],
-      width: 92%,
+      width: 80%,
     )
   ],
 
@@ -303,12 +312,12 @@
     #fig(
       "assets/figures/fig-broadcasts-power.svg",
       [Broadcasts per key, at $-24$ dBm and $+9$ dBm.],
-      width: 70%,
+      width: 58%,
     )
   ],
 )
 
-#v(5mm)
+#v(4mm)
 
 // ------------------------------------------------------------- the channel --
 
@@ -333,7 +342,32 @@
   )
 ]
 
-#v(5mm)
+#v(4mm)
+
+// ---------------------------------------------------------------- evidence --
+
+// Columns are the three crops' aspect ratios, so all three land on the same
+// height at width: 100%.
+#panel([Verified on real hardware], accent: orange)[
+  #grid(
+    columns: (3.741fr, 2.874fr, 4.045fr),
+    column-gutter: 7mm,
+    fig(
+      "assets/evidence-sniffer.png",
+      [A sniffer parses the beacon as Apple Find My --- company ID `0x004c`.],
+    ),
+    fig(
+      "assets/evidence-bytes.png",
+      [All 31 advertising bytes accounted for; 22 of them carry the key.],
+    ),
+    fig(
+      "assets/evidence-reports.png",
+      [Fetched back: 18 reports across 100 epoch keys, each a decrypted location.],
+    ),
+  )
+]
+
+#v(4mm)
 
 // ----------------------------------------------------------------- verdict --
 

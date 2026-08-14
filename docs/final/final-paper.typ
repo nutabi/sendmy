@@ -95,7 +95,7 @@ Internet connection of its own. The mechanism works roughly as follows
    downloads and decrypts the reports to recover the device's location history.
 
 #figure(
-  image("of-process.png", width: 65%),
+  image("assets/of-process.png", width: 65%),
   caption: [Simplified OF workflow @heinrich2021who]
 )
 
@@ -265,6 +265,27 @@ devices expect, so that to any scanner the result is an ordinary Find My
 advertisement. The layer is thread-safe against the advertising task, so the layer
 above can rotate the advertised key at any moment without racing the radio.
 
+@fig:sniffer confirms this on the air. An nRF Sniffer capture of a transmitting
+XIAO ESP32-S3 is dissected by Wireshark without any custom decoder: the packet is
+an ordinary `ADV_NONCONN_IND` whose advertising data is manufacturer-specific,
+carries Apple's company ID `0x004C`, and nothing in the frame distinguishes it
+from a genuine locator tag. The byte-level breakdown below it accounts for all 31
+advertising bytes and matches @tab:findmy-advertisement field for field, with the
+28-byte carrier split across the device address and the AD structure exactly as
+the format requires.
+
+#figure(
+  block(breakable: false, stack(
+    spacing: 6pt,
+    image("assets/evidence-sniffer.png", width: 100%),
+    image("assets/evidence-bytes.png", width: 100%),
+  )),
+  caption: [The link layer as seen from outside. *Top*: Wireshark's stock
+    dissection of a captured advertisement, resolving it to manufacturer-specific
+    data under Apple's company ID `0x004C`. *Bottom*: the same 31 advertising
+    bytes mapped field by field, matching @tab:findmy-advertisement.],
+) <fig:sniffer>
+
 == Carrier Layer: Encoding an Arbitrary Byte <carrier-layer>
 
 The link layer attaches no meaning to the key it advertises. Assigning meaning is
@@ -321,7 +342,29 @@ temperature sender that transmits one signed byte per message identifier. Both a
 built on ESP-IDF @espressif2024espidf and the NimBLE host stack
 @espressif2019espnimble, and run on a Seeed
 XIAO ESP32-S3 --- a compact module representative of the BLE-only devices the
-channel is meant to serve.
+channel is meant to serve. @fig:hardware shows the bench setup.
+
+#figure(
+  image("assets/esp32.jpeg", width: 78%),
+  caption: [The transmitter: a Seeed XIAO ESP32-S3 with its external 2.4 GHz
+    antenna (right), and the BME280 that `espsend` reads over I2C (left). A
+    one-pound coin gives the scale.],
+) <fig:hardware>
+
+Running `esptag` end to end exercises every layer at once. The beacon rotates
+through its key schedule on air; the receiver, holding only the `uid`, derives
+the same schedule locally and queries the backend for each candidate.
+@fig:esptag-reports shows the result of one such run: of 100 epoch keys derived
+from the shared secret, 18 had reports on file, each decrypting to a location
+fix with an accuracy estimate. No key that was never broadcast ever returned a
+report.
+
+#figure(
+  image("assets/evidence-reports.png", width: 100%),
+  caption: [Recovering an `esptag` transmission. The receiver derives 100 epoch
+    keys from the `uid` and fetches the reports filed against them; each line is
+    one decrypted location. Identifiers and precise coordinates are redacted.],
+) <fig:esptag-reports>
 
 = Characterising the Channel: The `espbench` Test Bench <espbench>
 
